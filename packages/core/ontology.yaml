@@ -1,0 +1,31 @@
+# Entertainment Planner Ontology
+# Defines standard categories, vibes, and cuisines for consistent tagging
+
+vibes:
+  - lazy      # Relaxed, slow-paced atmosphere
+  - cozy      # Warm, intimate, comfortable
+  - scenic    # Beautiful views, outdoor beauty
+  - vibrant   # Energetic, lively, dynamic
+  - classy    # Sophisticated, upscale, elegant
+  - budget    # Affordable, economical
+  - premium   # High-end, luxury, expensive
+  - date      # Romantic, couple-friendly
+  - solo      # Good for individual visits
+
+categories:
+  - food          # Restaurants, cafes, food courts
+  - coffee        # Coffee shops, tea houses
+  - bar           # Bars, pubs, lounges
+  - rooftop       # Elevated venues with views
+  - park          # Outdoor spaces, gardens
+  - gallery       # Art exhibitions, museums
+  - live-music    # Live performances, concerts
+  - night-market  # Evening markets, bazaars
+  - cinema        # Movie theaters, film venues
+  - workshop      # Creative activities, classes
+
+cuisines:
+  - thai-spicy    # Traditional Thai with heat
+  - tom-yum       # Tom yum soup specialties
+  - seafood       # Fish, shellfish dishes
+  - vegan         # Plant-based options
