@@ -1,0 +1,36 @@
+# Monorepo Project Rules
+# Scope: /apps, /packages, /docs
+# Mode: patch-diff only, no unrelated changes
+# Use Dir-scopes for focused changes
+
+## Core Rules
+- Work ONLY in repo root
+- Create/overwrite EXACTLY specified files
+- Use patch-diff mode only
+- No unrelated changes allowed
+- Apply Dir-scopes for focused modifications
+
+## Monorepo Structure
+- /apps - Application modules
+- /packages - Shared packages
+- /docs - Documentation
+- /scripts - Build and utility scripts
+
+## File Operations
+- Use search_replace for exact modifications
+- Maintain existing code structure
+- Follow established patterns
+- No unnecessary code generation
+
+## Scope Enforcement
+- Stay within specified directories
+- Respect package boundaries
+- Maintain separation of concerns
+- Follow monorepo best practices
+
+## Context7 Project Context
+# entertainment-planner: Multi-agent system for place data collection
+# Current Status: Core functionality complete
+# Database: 321 places from 16 TimeOut articles (283 unique)
+# Key Components: universal_timeout_parser.py, raw.db, apps/api, packages/search, apps/ui
+# Recent Achievement: Successfully parsed TimeOut articles with 100% description and image extraction
