@@ -11,25 +11,40 @@ from pathlib import Path
 from typing import List, Dict, Optional
 
 from enricher import PlaceEnricher
-from providers.maps_stub import MapsStubProvider
+from providers.maps_stub import GoogleMapsProvider, MapsStubProvider
 
 class EnrichmentRunner:
     """Runs the enrichment process"""
     
-    def __init__(self, raw_db: str = "raw.db", clean_db: str = "clean.db"):
+    def __init__(self, raw_db: str = "raw.db", clean_db: str = "clean.db", use_google_maps: bool = True):
         self.raw_db = raw_db
         self.clean_db = clean_db
-        self.enricher = PlaceEnricher(MapsStubProvider())
+        
+        # Choose provider based on preference
+        if use_google_maps:
+            print("🔍 Using Google Maps provider for real-time enrichment")
+            self.enricher = PlaceEnricher(GoogleMapsProvider())
+        else:
+            print("📋 Using stub provider for testing")
+            self.enricher = PlaceEnricher(MapsStubProvider())
     
     def get_latest_raw_places(self, limit: int) -> List[Dict]:
-        """Get latest N rows from raw_places"""
+        """Get latest N rows from raw_places with quality filtering"""
         conn = sqlite3.connect(self.raw_db)
         cursor = conn.cursor()
         
+        # Get places with good names (not too long, not generic)
         cursor.execute('''
             SELECT id, source, source_url, name_raw, description_raw, address_raw, raw_json, fetched_at
             FROM raw_places
-            ORDER BY fetched_at DESC
+            WHERE LENGTH(name_raw) BETWEEN 3 AND 100  -- Reasonable name length
+            AND name_raw NOT LIKE '%about%'  -- Skip generic descriptions
+            AND name_raw NOT LIKE '%news%'
+            AND name_raw NOT LIKE '%review%'
+            AND name_raw NOT LIKE '%Ethiopia%'
+            AND name_raw NOT LIKE '%Japan%'
+            AND name_raw NOT LIKE '%Spain%'
+            ORDER BY id ASC  -- Get first entries (usually better quality)
             LIMIT ?
         ''', (limit,))
         
@@ -159,7 +174,7 @@ class EnrichmentRunner:
         cursor.execute('SELECT COUNT(*) FROM places')
         count_before = cursor.fetchone()[0]
         
-        # Upsert from buffer to places
+        # Upsert from buffer to places (using name as unique key)
         cursor.execute('''
             INSERT OR REPLACE INTO places (
                 name, summary_160, full_description, lat, lng, district, city,
@@ -171,6 +186,7 @@ class EnrichmentRunner:
                 price_level, rating, ratings_count, hours_json, phone, site,
                 gmap_url, photos_json, tags_json, vibe_json, updated_at, 0.8
             FROM clean_buffer
+            WHERE name IS NOT NULL AND name != ''
         ''')
         
         # Get count after upsert
@@ -226,8 +242,11 @@ def main():
         print(f"❌ Clean database {args.clean_db} not found. Run db_init.py first.")
         return 1
     
+    # Determine provider based on arguments
+    use_google_maps = True  # Default to Google Maps
+    
     # Run enrichment
-    runner = EnrichmentRunner(args.raw_db, args.clean_db)
+    runner = EnrichmentRunner(args.raw_db, args.clean_db, use_google_maps)
     results = runner.run(args.limit, args.city)
     
     print(f"\n✅ Enrichment completed!")
