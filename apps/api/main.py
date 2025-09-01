@@ -288,9 +288,13 @@ async def recommend_places(
     # Get candidates via KNN
     knn_results = search_provider.knn(search_query, 20)
     knn_candidates = [doc_id for doc_id, score in knn_results]
-    
+
     # Combine and deduplicate candidates
     all_candidates = list(set(fts_candidates + knn_candidates))
+
+    # Return early if no candidates were found to avoid invalid SQL
+    if not all_candidates:
+        raise HTTPException(status_code=404, detail="No candidates found")
 
     # Fetch full place data
     candidates = []
@@ -300,7 +304,9 @@ async def recommend_places(
 
             if len(all_candidates) < 3:
                 cursor.execute("SELECT id FROM places LIMIT 3")
-                all_candidates = [row[0] for row in cursor.fetchall()]
+                extra_ids = [row[0] for row in cursor.fetchall()]
+                # Ensure we keep original candidates while topping up
+                all_candidates = list(set(all_candidates + extra_ids))
 
             placeholders = ','.join(['?' for _ in all_candidates])
             cursor.execute(f'''
