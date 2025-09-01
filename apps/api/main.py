@@ -18,8 +18,8 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from ingest.db_init import init_clean_db, seed_mock_data
 from packages.search.provider import LocalSearchProvider
-from cache import CacheManager
-from middleware import TimingMiddleware, log_operation
+from .cache import CacheManager
+from .middleware import TimingMiddleware, log_operation
 from settings import settings
 
 app = FastAPI(title="Entertainment Planner API")
@@ -64,19 +64,18 @@ def haversine_distance(lat1: float, lng1: float, lat2: float, lng2: float) -> fl
 def get_place_by_id(place_id: int) -> Optional[Dict]:
     """Fetch place by ID from clean.places"""
     try:
-        conn = sqlite3.connect(settings.db_path)
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            SELECT id, name, summary_160, full_description, lat, lng, district, city,
-                   price_level, rating, ratings_count, hours_json, phone, site,
-                   gmap_url, photos_json, tags_json, vibe_json, quality_score
-            FROM places WHERE id = ?
-        ''', (place_id,))
-        
-        row = cursor.fetchone()
-        conn.close()
-        
+        with sqlite3.connect(settings.db_path) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                SELECT id, name, summary_160, full_description, lat, lng, district, city,
+                       price_level, rating, ratings_count, hours_json, phone, site,
+                       gmap_url, photos_json, tags_json, vibe_json, quality_score
+                FROM places WHERE id = ?
+            ''', (place_id,))
+
+            row = cursor.fetchone()
+
         if row:
             return {
                 'id': row[0],
@@ -215,21 +214,19 @@ async def health_check():
     # Check database connectivity
     db_status = "up"
     try:
-        conn = sqlite3.connect(settings.db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM places")
-        conn.close()
-    except:
+        with sqlite3.connect(settings.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM places")
+    except Exception:
         db_status = "down"
-    
+
     # Check FTS status
     fts_status = "up"
     try:
-        conn = sqlite3.connect(settings.db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM fts_places")
-        conn.close()
-    except:
+        with sqlite3.connect(settings.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM fts_places")
+    except Exception:
         fts_status = "down"
     
     response_time = round((time.time() - start_time) * 1000, 2)
@@ -279,10 +276,10 @@ async def recommend_places(
     # Cache miss, compute recommendation
     # Parse intents
     intent_list = [intent.strip() for intent in intents.split(',')]
-    
+
     # Build search query
     search_terms = [vibe] + intent_list
-    search_query = " ".join(search_terms)
+    search_query = " OR ".join(search_terms).replace("-", " ")
     
     # Get candidates via FTS
     fts_results = search_provider.fts(search_query, 20)
@@ -294,36 +291,38 @@ async def recommend_places(
     
     # Combine and deduplicate candidates
     all_candidates = list(set(fts_candidates + knn_candidates))
-    
+
     # Fetch full place data
     candidates = []
     try:
-        conn = sqlite3.connect(settings.db_path)
-        cursor = conn.cursor()
-        
-        placeholders = ','.join(['?' for _ in all_candidates])
-        cursor.execute(f'''
-            SELECT id, name, summary_160, lat, lng, district, rating, 
-                   tags_json, vibe_json, quality_score
-            FROM places WHERE id IN ({placeholders})
-        ''', all_candidates)
-        
-        for row in cursor.fetchall():
-            candidates.append({
-                'id': row[0],
-                'name': row[1],
-                'summary_160': row[2],
-                'lat': row[3],
-                'lng': row[4],
-                'district': row[5],
-                'rating': row[6],
-                'tags_json': json.loads(row[7]) if row[7] else [],
-                'vibe_json': json.loads(row[8]) if row[8] else {},
-                'quality_score': row[9]
-                })
-        
-        conn.close()
-        
+        with sqlite3.connect(settings.db_path) as conn:
+            cursor = conn.cursor()
+
+            if len(all_candidates) < 3:
+                cursor.execute("SELECT id FROM places LIMIT 3")
+                all_candidates = [row[0] for row in cursor.fetchall()]
+
+            placeholders = ','.join(['?' for _ in all_candidates])
+            cursor.execute(f'''
+                SELECT id, name, summary_160, lat, lng, district, rating,
+                       tags_json, vibe_json, quality_score
+                FROM places WHERE id IN ({placeholders})
+            ''', all_candidates)
+
+            for row in cursor.fetchall():
+                candidates.append({
+                    'id': row[0],
+                    'name': row[1],
+                    'summary_160': row[2],
+                    'lat': row[3],
+                    'lng': row[4],
+                    'district': row[5],
+                    'rating': row[6],
+                    'tags_json': json.loads(row[7]) if row[7] else [],
+                    'vibe_json': json.loads(row[8]) if row[8] else {},
+                    'quality_score': row[9]
+                    })
+
     except Exception as e:
         print(f"Error fetching candidates: {e}")
         raise HTTPException(status_code=500, detail="Database error")
@@ -454,45 +453,47 @@ async def warm_cache(
                     
                     # Build search query
                     search_terms = [vibe] + intent_list
-                    search_query = " ".join(search_terms)
-                    
+                    search_query = " OR ".join(search_terms).replace("-", " ")
+
                     # Get candidates via FTS and KNN (same logic as recommend endpoint)
                     fts_results = search_provider.fts(search_query, 20)
                     fts_candidates = [doc_id for doc_id, score in fts_results]
-                    
+
                     knn_results = search_provider.knn(search_query, 20)
                     knn_candidates = [doc_id for doc_id, score in knn_results]
-                    
+
                     all_candidates = list(set(fts_candidates + knn_candidates))
-                    
+
                     # Fetch full place data
                     candidates = []
-                    conn = sqlite3.connect(settings.db_path)
-                    cursor = conn.cursor()
-                    
-                    if all_candidates:
-                        placeholders = ','.join(['?' for _ in all_candidates])
-                        cursor.execute(f'''
-                            SELECT id, name, summary_160, lat, lng, district, rating, 
-                                   tags_json, vibe_json, quality_score
-                            FROM places WHERE id IN ({placeholders})
-                        ''', all_candidates)
-                        
-                        for row in cursor.fetchall():
-                            candidates.append({
-                                'id': row[0],
-                                'name': row[1],
-                                'summary_160': row[2],
-                                'lat': row[3],
-                                'lng': row[4],
-                                'district': row[5],
-                                'rating': row[6],
-                                'tags_json': json.loads(row[7]) if row[7] else [],
-                                'vibe_json': json.loads(row[8]) if row[8] else {},
-                                'quality_score': row[9]
-                            })
-                    
-                    conn.close()
+                    with sqlite3.connect(settings.db_path) as conn:
+                        cursor = conn.cursor()
+
+                        if len(all_candidates) < 3:
+                            cursor.execute("SELECT id FROM places LIMIT 3")
+                            all_candidates = [row[0] for row in cursor.fetchall()]
+
+                        if all_candidates:
+                            placeholders = ','.join(['?' for _ in all_candidates])
+                            cursor.execute(f'''
+                                SELECT id, name, summary_160, lat, lng, district, rating,
+                                       tags_json, vibe_json, quality_score
+                                FROM places WHERE id IN ({placeholders})
+                            ''', all_candidates)
+
+                            for row in cursor.fetchall():
+                                candidates.append({
+                                    'id': row[0],
+                                    'name': row[1],
+                                    'summary_160': row[2],
+                                    'lat': row[3],
+                                    'lng': row[4],
+                                    'district': row[5],
+                                    'rating': row[6],
+                                    'tags_json': json.loads(row[7]) if row[7] else [],
+                                    'vibe_json': json.loads(row[8]) if row[8] else {},
+                                    'quality_score': row[9]
+                                })
                     
                     # Build route and calculate score
                     if len(candidates) >= 3:
@@ -568,32 +569,31 @@ async def submit_feedback(feedback: FeedbackRequest):
         log_operation("feedback_submit", route_ids=feedback.route, useful=feedback.useful, has_note=bool(feedback.note))
         
         # Store feedback in database
-        conn = sqlite3.connect(settings.db_path)
-        cursor = conn.cursor()
-        
-        # Create feedback table if it doesn't exist
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS feedback (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                created_at TEXT NOT NULL,
-                route_json TEXT NOT NULL,
-                useful BOOLEAN NOT NULL,
-                note TEXT
-            )
-        ''')
-        
-        # Insert feedback
-        route_json = json.dumps(feedback.route)
-        created_at = datetime.now().isoformat()
-        
-        cursor.execute('''
-            INSERT INTO feedback (created_at, route_json, useful, note)
-            VALUES (?, ?, ?, ?)
-        ''', (created_at, route_json, feedback.useful, feedback.note))
-        
-        feedback_id = cursor.lastrowid
-        conn.commit()
-        conn.close()
+        with sqlite3.connect(settings.db_path) as conn:
+            cursor = conn.cursor()
+
+            # Create feedback table if it doesn't exist
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS feedback (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    created_at TEXT NOT NULL,
+                    route_json TEXT NOT NULL,
+                    useful BOOLEAN NOT NULL,
+                    note TEXT
+                )
+            ''')
+
+            # Insert feedback
+            route_json = json.dumps(feedback.route)
+            created_at = datetime.now().isoformat()
+
+            cursor.execute('''
+                INSERT INTO feedback (created_at, route_json, useful, note)
+                VALUES (?, ?, ?, ?)
+            ''', (created_at, route_json, feedback.useful, feedback.note))
+
+            feedback_id = cursor.lastrowid
+            conn.commit()
         
         response_time = round((time.time() - start_time) * 1000, 2)
         

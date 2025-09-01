@@ -267,37 +267,36 @@ class TimeOutBkkParser:
     
     def insert_raw_places(self, data: List[Dict]) -> int:
         """Insert raw places data into raw.db with deduplication"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
         inserted_count = 0
-        
-        for item in data:
-            try:
-                cursor.execute('''
-                    INSERT OR IGNORE INTO raw_places 
-                    (source, source_url, name_raw, description_raw, address_raw, raw_json, fetched_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    self.source,
-                    item['source_url'],
-                    item['name_raw'],
-                    item['description_raw'],
-                    item['address_raw'],
-                    json.dumps(item['raw_json']),
-                    datetime.now().isoformat()
-                ))
-                
-                if cursor.rowcount > 0:
-                    inserted_count += 1
-                    
-            except Exception as e:
-                print(f"Error inserting {item['name_raw']}: {e}")
-                continue
-        
-        conn.commit()
-        conn.close()
-        
+
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+
+            for item in data:
+                try:
+                    cursor.execute('''
+                        INSERT OR IGNORE INTO raw_places
+                        (source, source_url, name_raw, description_raw, address_raw, raw_json, fetched_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ''', (
+                        self.source,
+                        item['source_url'],
+                        item['name_raw'],
+                        item['description_raw'],
+                        item['address_raw'],
+                        json.dumps(item['raw_json']),
+                        datetime.now().isoformat()
+                    ))
+
+                    if cursor.rowcount > 0:
+                        inserted_count += 1
+
+                except Exception as e:
+                    print(f"Error inserting {item['name_raw']}: {e}")
+                    continue
+
+            conn.commit()
+
         return inserted_count
     
     def run(self, limit: int = 10, url: str = None, use_real: bool = False) -> int:

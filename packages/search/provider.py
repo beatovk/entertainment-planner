@@ -74,25 +74,24 @@ class LocalSearchProvider(SearchProvider):
     def index(self, doc_id: int, text: str) -> bool:
         """Index a document with FTS5 and embeddings"""
         try:
-            conn = self._connect()
-            cursor = conn.cursor()
-            
-            # Insert into FTS5
-            cursor.execute('''
-                INSERT OR REPLACE INTO fts_places (name, summary_160, tags)
-                VALUES (?, ?, ?)
-            ''', (text, text, text))
-            
-            # Compute and store embedding
-            embedding = self._compute_embedding(text)
-            cursor.execute('''
-                INSERT OR REPLACE INTO embeddings (doc_id, vector, dim)
-                VALUES (?, ?, ?)
-            ''', (doc_id, embedding, self.embedding_dim))
-            
-            conn.commit()
-            conn.close()
-            return True
+            with self._connect() as conn:
+                cursor = conn.cursor()
+
+                # Insert into FTS5
+                cursor.execute('''
+                    INSERT OR REPLACE INTO fts_places (name, summary_160, tags)
+                    VALUES (?, ?, ?)
+                ''', (text, text, text))
+
+                # Compute and store embedding
+                embedding = self._compute_embedding(text)
+                cursor.execute('''
+                    INSERT OR REPLACE INTO embeddings (doc_id, vector, dim)
+                    VALUES (?, ?, ?)
+                ''', (doc_id, embedding, self.embedding_dim))
+
+                conn.commit()
+                return True
             
         except Exception as e:
             print(f"Error indexing doc {doc_id}: {e}")
@@ -101,27 +100,26 @@ class LocalSearchProvider(SearchProvider):
     def knn(self, query_text: str, top_k: int) -> List[Tuple[int, float]]:
         """Find top-k most similar documents using k-NN on embeddings"""
         try:
-            conn = self._connect()
-            cursor = conn.cursor()
-            
-            # Get query embedding
-            query_embedding = self._compute_embedding(query_text)
-            
-            # Get all document embeddings
-            cursor.execute('SELECT doc_id, vector FROM embeddings')
-            embeddings = cursor.fetchall()
-            
-            # Compute similarities
-            similarities = []
-            for doc_id, vec_bytes in embeddings:
-                similarity = self._cosine_similarity(query_embedding, vec_bytes)
-                similarities.append((doc_id, similarity))
-            
-            # Sort by similarity (descending) and return top-k
-            similarities.sort(key=lambda x: x[1], reverse=True)
-            conn.close()
-            
-            return similarities[:top_k]
+            with self._connect() as conn:
+                cursor = conn.cursor()
+
+                # Get query embedding
+                query_embedding = self._compute_embedding(query_text)
+
+                # Get all document embeddings
+                cursor.execute('SELECT doc_id, vector FROM embeddings')
+                embeddings = cursor.fetchall()
+
+                # Compute similarities
+                similarities = []
+                for doc_id, vec_bytes in embeddings:
+                    similarity = self._cosine_similarity(query_embedding, vec_bytes)
+                    similarities.append((doc_id, similarity))
+
+                # Sort by similarity (descending) and return top-k
+                similarities.sort(key=lambda x: x[1], reverse=True)
+
+                return similarities[:top_k]
             
         except Exception as e:
             print(f"Error in kNN search: {e}")
@@ -130,21 +128,20 @@ class LocalSearchProvider(SearchProvider):
     def fts(self, query: str, top_k: int) -> List[Tuple[int, float]]:
         """Full-text search using FTS5"""
         try:
-            conn = self._connect()
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                SELECT rowid, rank FROM fts_places 
-                WHERE fts_places MATCH ? 
-                ORDER BY rank
-                LIMIT ?
-            ''', (query, top_k))
-            
-            results = cursor.fetchall()
-            conn.close()
-            
-            # Convert rank to similarity score (lower rank = higher score)
-            return [(doc_id, 1.0 / (rank + 1)) for doc_id, rank in results]
+            with self._connect() as conn:
+                cursor = conn.cursor()
+
+                cursor.execute('''
+                    SELECT rowid, rank FROM fts_places
+                    WHERE fts_places MATCH ?
+                    ORDER BY rank
+                    LIMIT ?
+                ''', (query, top_k))
+
+                results = cursor.fetchall()
+
+                # Convert rank to similarity score (lower rank = higher score)
+                return [(doc_id, 1.0 / (rank + 1)) for doc_id, rank in results]
             
         except Exception as e:
             print(f"Error in FTS search: {e}")
