@@ -1,5 +1,7 @@
-import requests
 from unittest.mock import patch
+
+import requests
+
 from universal_timeout_parser import UniversalTimeOutParser
 
 

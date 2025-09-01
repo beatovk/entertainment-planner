@@ -5,8 +5,11 @@ Rebuilds all search indices from clean.places
 """
 import argparse
 from pathlib import Path
+
 from indexer import SearchIndexer
+
 from logger import logger
+
 
 def main():
     """CLI entry point"""

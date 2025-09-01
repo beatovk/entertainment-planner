@@ -1,6 +1,5 @@
-import sqlite3
 import json
-from datetime import datetime
+import sqlite3
 from pathlib import Path
 from typing import Union
 
@@ -230,7 +229,7 @@ def print_row_counts(raw_db_path: Union[str, Path] = "raw.db", clean_db_path: Un
     fts_count = cursor.fetchone()[0]
     conn.close()
     
-    print(f"\n📊 Database Row Counts:")
+    print("\n📊 Database Row Counts:")
     print(f"{raw_db_path} - raw_places: {raw_count}")
     print(f"{clean_db_path} - places: {places_count}")
     print(f"{clean_db_path} - embeddings: {embeddings_count}")

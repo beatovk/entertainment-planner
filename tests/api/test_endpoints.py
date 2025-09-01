@@ -1,14 +1,16 @@
 import os
 import uuid
 from importlib import reload
+from typing import Any, Dict, Iterator
 
 import pytest
-fastapi = pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient
+
+pytest.importorskip("fastapi")
 
 
 @pytest.fixture(scope="module")
-def client(tmp_path_factory):
+def client(tmp_path_factory: pytest.TempPathFactory) -> Iterator[TestClient]:
     db_path = tmp_path_factory.mktemp("db") / f"{uuid.uuid4().hex}.db"
     os.environ["DB_PATH"] = str(db_path)
 
@@ -21,7 +23,7 @@ def client(tmp_path_factory):
         db_path.unlink()
 
 
-def test_health_endpoint(client):
+def test_health_endpoint(client: TestClient) -> None:
     response = client.get("/api/health")
     assert response.status_code == 200
     data = response.json()
@@ -32,16 +34,16 @@ def test_health_endpoint(client):
     assert "X-Debug" in response.headers
 
 
-def test_get_place_by_id(client):
+def test_get_place_by_id(client: TestClient) -> None:
     response = client.get("/api/places/1")
     assert response.status_code == 200
-    data = response.json()
+    data: Dict[str, Any] = response.json()
     assert data["id"] == 1
     assert "name" in data
 
 
-def test_recommend_places(client):
-    params = {
+def test_recommend_places(client: TestClient) -> None:
+    params: Dict[str, Any] = {
         "vibe": "lazy",
         "intents": "tom-yum,walk,rooftop",
         "lat": 13.7563,
@@ -60,8 +62,8 @@ def test_recommend_places(client):
     assert "X-Debug" in response.headers
 
 
-def test_recommend_places_missing_params(client):
-    params = {
+def test_recommend_places_missing_params(client: TestClient) -> None:
+    params: Dict[str, Any] = {
         "intents": "tom-yum,walk",
         "lat": 13.7563,
         "lng": 100.5018,

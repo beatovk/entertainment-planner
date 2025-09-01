@@ -5,16 +5,19 @@ Generates ONLY beautiful, poetic 4-sentence descriptions in B2 English level
 NO truncation, NO simple rules - ONLY GPT-4o mini generated summaries
 """
 import argparse
-import sqlite3
 import json
-import yaml
 import re
+import sqlite3
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Optional, Tuple
-from dataclasses import dataclass
+from typing import Dict, List
+
 import openai
+import yaml
+
 from logger import logger
+
 
 @dataclass
 class SummarizationResult:
@@ -102,7 +105,7 @@ Write your description:
         try:
             if raw_json:
                 raw_data = json.loads(raw_json)
-        except:
+        except Exception:
             pass
         
         # Combine all text for analysis
@@ -239,7 +242,7 @@ Write your description:
                     score += 0.2
                 elif days_old <= 30:
                     score += 0.1
-            except:
+            except Exception:
                 pass
         
         # Additional data (10%)
@@ -375,8 +378,8 @@ class GPTSummarizationRunner:
     def run(self, limit: int) -> Dict[str, int]:
         """Main summarization process - ONLY generates summary_160"""
         logger.info(f"🚀 Starting GPT-4o mini summarization process for {limit} places...")
-        logger.info(f"🎯 Focus: Generate ONLY beautiful 4-sentence summaries from full_description")
-        logger.info(f"❌ NO TRUNCATION, NO SIMPLE RULES - ONLY GPT-4o mini")
+        logger.info("🎯 Focus: Generate ONLY beautiful 4-sentence summaries from full_description")
+        logger.info("❌ NO TRUNCATION, NO SIMPLE RULES - ONLY GPT-4o mini")
         
         # Create pending_tags table
         self.create_pending_tags_table()

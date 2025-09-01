@@ -4,15 +4,17 @@ Place Enrichment Runner
 Reads from raw.db, enriches data, and writes to clean.db
 """
 import argparse
-import sqlite3
 import json
+import sqlite3
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import Dict, List
 
 from enricher import PlaceEnricher
 from providers.maps_stub import GoogleMapsProvider, MapsStubProvider
+
 from logger import logger
+
 
 class EnrichmentRunner:
     """Runs the enrichment process"""

@@ -1,6 +1,8 @@
+from unittest.mock import patch
+
 import pytest
 import requests
-from unittest.mock import patch
+
 from universal_parser import UniversalPlaceParser
 
 pytest.importorskip("requests")

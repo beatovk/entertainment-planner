@@ -1,248 +1,136 @@
+"""Two-layer caching utilities for API responses."""
+
+from __future__ import annotations
+
 import json
 import sqlite3
 import time
-import os
-from typing import Any, Dict, Optional, Tuple
-from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional, Tuple
 
-from settings import settings
+from apps.api.settings import settings
 from logger import logger
 
+
 class MemoryTTLCache:
-    """In-memory TTL cache using dictionary"""
-    
-    def __init__(self, default_ttl_days: int = 7):
+    """Simple in-memory cache with per-key TTL."""
+
+    def __init__(self, default_ttl_days: int = 7) -> None:
         self.cache: Dict[str, Dict[str, Any]] = {}
         self.default_ttl_days = default_ttl_days
-    
+
     def get(self, key: str) -> Optional[Any]:
-        """Get value from memory cache if not expired"""
         if key not in self.cache:
             return None
-        
         entry = self.cache[key]
-        if time.time() > entry['expire_ts']:
-            # Expired, remove from cache
+        if time.time() > entry["expire_ts"]:
             del self.cache[key]
             return None
-        
-        return entry['value']
-    
+        return entry["value"]
+
     def set(self, key: str, value: Any, ttl_days: Optional[int] = None) -> None:
-        """Set value in memory cache with TTL"""
         ttl = ttl_days or self.default_ttl_days
-        expire_ts = time.time() + (ttl * 24 * 3600)  # Convert days to seconds
-        
-        self.cache[key] = {
-            'value': value,
-            'expire_ts': expire_ts
-        }
-    
-    def clear(self) -> None:
-        """Clear all cached items"""
-        self.cache.clear()
+        expire_ts = time.time() + ttl * 24 * 3600
+        self.cache[key] = {"value": value, "expire_ts": expire_ts}
+
 
 class SQLiteCache:
-    """SQLite-based persistent cache"""
+    """SQLite-backed cache with TTL support."""
 
-    def __init__(self, db_path: str = settings.db_path):
+    def __init__(self, db_path: str) -> None:
         self.db_path = db_path
-        self._ensure_table_exists()
-    
-    def _ensure_table_exists(self) -> None:
-        """Ensure cache_entries table exists"""
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.cursor()
+        self._ensure_schema()
 
-                cursor.execute('''
-                    CREATE TABLE IF NOT EXISTS cache_entries (
-                        key TEXT PRIMARY KEY,
-                        value_json TEXT NOT NULL,
-                        stored_at TEXT NOT NULL,
-                        ttl_seconds INTEGER NOT NULL
-                    )
-                ''')
+    def _ensure_schema(self) -> None:
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS cache (
+                  key TEXT PRIMARY KEY,
+                  value TEXT NOT NULL,
+                  expire_ts REAL NOT NULL
+                );
+                """
+            )
+            conn.commit()
 
-                # Create index for faster lookups
-                cursor.execute('''
-                    CREATE INDEX IF NOT EXISTS idx_cache_expiry
-                    ON cache_entries(stored_at, ttl_seconds)
-                ''')
-
-                conn.commit()
-        except Exception as e:
-            logger.warning(f"Could not create cache table: {e}")
-    
     def get(self, key: str) -> Optional[Any]:
-        """Get value from SQLite cache if not expired"""
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.cursor()
-
-                cursor.execute('''
-                    SELECT value_json, stored_at, ttl_seconds
-                    FROM cache_entries
-                    WHERE key = ?
-                ''', (key,))
-
-                row = cursor.fetchone()
-
-            if not row:
-                return None
-            
-            value_json, stored_at_str, ttl_seconds = row
-            
-            # Check if expired
-            stored_at = datetime.fromisoformat(stored_at_str)
-            expire_time = stored_at + timedelta(seconds=ttl_seconds)
-            
-            if datetime.now() > expire_time:
-                # Expired, remove from cache
-                self._remove_expired(key)
-                return None
-            
-            # Parse and return value
-            return json.loads(value_json)
-            
-        except Exception as e:
-            logger.warning(f"SQLite cache get error: {e}")
+        now = time.time()
+        with sqlite3.connect(self.db_path) as conn:
+            row = conn.execute(
+                "SELECT value, expire_ts FROM cache WHERE key = ?",
+                (key,),
+            ).fetchone()
+        if not row:
             return None
-    
-    def set(self, key: str, value: Any, ttl_days: int = 7) -> bool:
-        """Set value in SQLite cache with TTL"""
+        value_json, expire_ts = row
+        if now > float(expire_ts):
+            return None
         try:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.cursor()
+            return json.loads(value_json)
+        except Exception:
+            logger.warning("SQLiteCache: failed to decode JSON for key=%s", key)
+            return None
 
-                ttl_seconds = ttl_days * 24 * 3600
-                stored_at = datetime.now().isoformat()
-                value_json = json.dumps(value, ensure_ascii=False)
+    def set(self, key: str, value: Any, ttl_days: int = 7) -> None:
+        expire_ts = time.time() + ttl_days * 24 * 3600
+        payload = json.dumps(value, ensure_ascii=False)
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO cache (key, value, expire_ts) VALUES (?, ?, ?)",
+                (key, payload, expire_ts),
+            )
+            conn.commit()
 
-                cursor.execute('''
-                    INSERT OR REPLACE INTO cache_entries (key, value_json, stored_at, ttl_seconds)
-                    VALUES (?, ?, ?, ?)
-                ''', (key, value_json, stored_at, ttl_seconds))
+    def cleanup(self) -> int:
+        now = time.time()
+        with sqlite3.connect(self.db_path) as conn:
+            cur = conn.execute("DELETE FROM cache WHERE expire_ts < ?", (now,))
+            conn.commit()
+            return cur.rowcount
 
-                conn.commit()
-                return True
-            
-        except Exception as e:
-            logger.warning(f"SQLite cache set error: {e}")
-            return False
-    
-    def _remove_expired(self, key: str) -> None:
-        """Remove expired entry from cache"""
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute('DELETE FROM cache_entries WHERE key = ?', (key,))
-                conn.commit()
-        except Exception as e:
-            logger.warning(f"Could not remove expired cache entry: {e}")
-    
-    def cleanup_expired(self) -> int:
-        """Clean up all expired entries, return count removed"""
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.cursor()
-
-                # Find expired entries
-                now = datetime.now().isoformat()
-                cursor.execute('''
-                    SELECT key FROM cache_entries
-                    WHERE datetime(stored_at) + (ttl_seconds || ' seconds') < datetime(?)
-                ''', (now,))
-
-                expired_keys = [row[0] for row in cursor.fetchall()]
-
-                if expired_keys:
-                    placeholders = ','.join(['?' for _ in expired_keys])
-                    cursor.execute(f'DELETE FROM cache_entries WHERE key IN ({placeholders})', expired_keys)
-                    conn.commit()
-
-            return len(expired_keys)
-            
-        except Exception as e:
-            logger.warning(f"Cache cleanup error: {e}")
-            return 0
 
 class CacheManager:
-    """Two-layer cache manager with memory and SQLite"""
+    """High-level two-layer cache manager."""
 
-    def __init__(self, db_path: str = settings.db_path):
-        self.memory_cache = MemoryTTLCache()
-        self.sqlite_cache = SQLiteCache(db_path)
-        self.default_ttl_days = int(os.getenv('WP_CACHE_TTL_DAYS', '7'))
-    
+    def __init__(
+        self,
+        memory_ttl_days: int = 7,
+        sqlite_db_path: Optional[str] = None,
+    ) -> None:
+        self.memory = MemoryTTLCache(default_ttl_days=memory_ttl_days)
+        self.sqlite = SQLiteCache(sqlite_db_path or settings.cache_db_path)
+
+    def build_cache_key(
+        self,
+        city: str,
+        day: str,
+        vibe: str,
+        intents: List[str],
+        lat: float,
+        lng: float,
+    ) -> str:
+        intents_part = ",".join(sorted(intents))
+        return (
+            f"rec:{city.lower()}:{day}:{vibe.lower()}:{intents_part}:{round(lat,6)}:{round(lng,6)}"
+        )
+
     def get(self, key: str) -> Tuple[Optional[Any], str, str]:
-        """
-        Get value from cache layers
-        Returns: (value, cache_status, cache_store)
-        """
-        # Try memory cache first
-        value = self.memory_cache.get(key)
-        if value is not None:
-            return value, "HIT", "memory"
-        
-        # Try SQLite cache
-        value = self.sqlite_cache.get(key)
-        if value is not None:
-            # Store in memory for faster subsequent access
-            self.memory_cache.set(key, value, self.default_ttl_days)
-            return value, "HIT", "sqlite"
-        
-        # Cache miss
-        return None, "MISS", "compute"
-    
-    def set(self, key: str, value: Any, ttl_days: Optional[int] = None) -> None:
-        """Set value in both cache layers"""
-        ttl = ttl_days or self.default_ttl_days
-        
-        # Store in memory
-        self.memory_cache.set(key, value, ttl)
-        
-        # Store in SQLite (async-like, don't block)
-        try:
-            self.sqlite_cache.set(key, value, ttl)
-        except Exception as e:
-            logger.warning(f"Could not persist to SQLite cache: {e}")
-    
-    def build_cache_key(self, city: str, day: str, vibe: str, intents: str, 
-                       lat: float, lng: float) -> str:
-        """
-        Build cache key with coordinate bucketing to avoid key explosion
-        Bucket coordinates by ~0.01 degrees (~1km at equator)
-        """
-        lat_bucket = round(lat, 2)
-        lng_bucket = round(lng, 2)
-        
-        # Normalize intents (sort to ensure consistent keys)
-        intent_list = sorted([intent.strip() for intent in intents.split(',')])
-        normalized_intents = ','.join(intent_list)
-        
-        return f"v2:{city}:{day}:{vibe}:{normalized_intents}:{lat_bucket}:{lng_bucket}"
-    
-    def clear_all(self) -> None:
-        """Clear all caches"""
-        self.memory_cache.clear()
-        # Note: SQLite cleanup is handled by TTL expiration
-    
-    def get_stats(self) -> Dict[str, Any]:
-        """Get cache statistics"""
-        memory_count = len(self.memory_cache.cache)
-        sqlite_count = 0
-        
-        try:
-            with sqlite3.connect(self.sqlite_cache.db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute('SELECT COUNT(*) FROM cache_entries')
-                sqlite_count = cursor.fetchone()[0]
-        except Exception:
-            pass
-        
-        return {
-            'memory_entries': memory_count,
-            'sqlite_entries': sqlite_count,
-            'default_ttl_days': self.default_ttl_days
-        }
+        val = self.memory.get(key)
+        if val is not None:
+            return val, "HIT", "memory"
+        val = self.sqlite.get(key)
+        if val is not None:
+            self.memory.set(key, val)
+            return val, "HIT", "sqlite"
+        return None, "MISS", "-"
+
+    def set(self, key: str, value: Any, ttl_days: int = 7) -> None:
+        self.memory.set(key, value, ttl_days=ttl_days)
+        self.sqlite.set(key, value, ttl_days=ttl_days)
+
+    def cleanup(self) -> int:
+        return self.sqlite.cleanup()
+
+
+__all__ = ["MemoryTTLCache", "SQLiteCache", "CacheManager"]
+

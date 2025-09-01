@@ -4,14 +4,13 @@
 Поддерживает различные форматы и количество мест
 """
 
-import re
 import json
-from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urlparse
+import re
+from typing import Dict, List, Optional
+
 import requests
-from typing import List, Dict, Optional
-import time
-import random
+from bs4 import BeautifulSoup
+
 
 class UniversalPlaceParser:
     def __init__(self):
@@ -235,10 +234,8 @@ class UniversalPlaceParser:
             link = item.find('a')
             if link:
                 title = link.get_text(strip=True)
-                href = link.get('href', '')
             else:
                 title = text
-                href = ""
             
             # Ищем изображение
             img_elem = item.find('img')

@@ -1,8 +1,12 @@
-from abc import ABC, abstractmethod
-from typing import List, Tuple, Optional
+from __future__ import annotations
+
 import os
 import sqlite3
+from abc import ABC, abstractmethod
+from typing import Any, Dict, List, Optional, Tuple, cast  # noqa: F401
+
 from logger import logger
+
 
 class SearchProvider(ABC):
     """Abstract interface for search providers"""
@@ -25,11 +29,12 @@ class SearchProvider(ABC):
 class LocalSearchProvider(SearchProvider):
     """Local search provider using FTS5 + deterministic embeddings"""
 
-    def __init__(self, db_path: Optional[str] = None):
-        self.db_path = db_path or os.getenv("DB_PATH", "./data/clean.db")
+    def __init__(self, db_path: Optional[str] = None) -> None:
+        env_db = os.getenv("DB_PATH", "./data/clean.db")
+        self.db_path: str = db_path if db_path is not None else env_db
         self.embedding_dim = 64  # Fixed dimension for deterministic vectors
 
-    def _connect(self):
+    def _connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self.db_path)
     
     def _compute_embedding(self, text: str) -> bytes:
