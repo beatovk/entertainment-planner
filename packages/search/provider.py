@@ -132,20 +132,26 @@ class LocalSearchProvider(SearchProvider):
         try:
             conn = self._connect()
             cursor = conn.cursor()
-            
-            cursor.execute('''
-                SELECT rowid, rank FROM fts_places 
-                WHERE fts_places MATCH ? 
+
+            # Replace problematic characters to avoid FTS syntax errors
+            safe_query = query.replace('-', ' ')
+
+            cursor.execute(
+                '''
+                SELECT rowid, rank FROM fts_places
+                WHERE fts_places MATCH ?
                 ORDER BY rank
                 LIMIT ?
-            ''', (query, top_k))
-            
+                ''',
+                (safe_query, top_k),
+            )
+
             results = cursor.fetchall()
             conn.close()
-            
+
             # Convert rank to similarity score (lower rank = higher score)
             return [(doc_id, 1.0 / (rank + 1)) for doc_id, rank in results]
-            
+
         except Exception as e:
             print(f"Error in FTS search: {e}")
             return []

@@ -1,12 +1,6 @@
+# apps/api/settings.py
 import os
-try:
-    from pydantic_settings import BaseSettings  # pydantic v2
-except Exception:  # pydantic may be unavailable
-    class BaseSettings:  # minimal stub
-        def __init__(self, **kwargs):
-            for k, v in kwargs.items():
-                setattr(self, k, v)
-
+from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     app_env: str = os.getenv("APP_ENV", "local")
@@ -16,5 +10,8 @@ class Settings(BaseSettings):
     http_timeout: int = int(os.getenv("HTTP_TIMEOUT", "30"))
     log_level: str = os.getenv("LOG_LEVEL", "INFO")
 
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
 
 settings = Settings()
