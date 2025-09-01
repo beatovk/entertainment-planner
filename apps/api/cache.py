@@ -5,6 +5,8 @@ import os
 from typing import Any, Dict, Optional, Tuple
 from datetime import datetime, timedelta
 
+from settings import settings
+
 class MemoryTTLCache:
     """In-memory TTL cache using dictionary"""
     
@@ -41,8 +43,8 @@ class MemoryTTLCache:
 
 class SQLiteCache:
     """SQLite-based persistent cache"""
-    
-    def __init__(self, db_path: str = "clean.db"):
+
+    def __init__(self, db_path: str = settings.db_path):
         self.db_path = db_path
         self._ensure_table_exists()
     
@@ -172,8 +174,8 @@ class SQLiteCache:
 
 class CacheManager:
     """Two-layer cache manager with memory and SQLite"""
-    
-    def __init__(self, db_path: str = "clean.db"):
+
+    def __init__(self, db_path: str = settings.db_path):
         self.memory_cache = MemoryTTLCache()
         self.sqlite_cache = SQLiteCache(db_path)
         self.default_ttl_days = int(os.getenv('WP_CACHE_TTL_DAYS', '7'))

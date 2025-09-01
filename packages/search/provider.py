@@ -3,6 +3,8 @@ from typing import List, Tuple, Optional
 import sqlite3
 import json
 
+from settings import settings
+
 class SearchProvider(ABC):
     """Abstract interface for search providers"""
     
@@ -23,8 +25,8 @@ class SearchProvider(ABC):
 
 class LocalSearchProvider(SearchProvider):
     """Local search provider using FTS5 + deterministic embeddings"""
-    
-    def __init__(self, db_path: str = "clean.db"):
+
+    def __init__(self, db_path: str = settings.db_path):
         self.db_path = db_path
         self.embedding_dim = 64  # Fixed dimension for deterministic vectors
     

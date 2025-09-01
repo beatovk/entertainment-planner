@@ -90,6 +90,10 @@ cd apps/ui && npm start
 bash scripts/run_tests.sh
 ```
 
+## Environment Variables
+
+- `DB_PATH` – path to the SQLite database. Defaults to `clean.db` in the project root.
+
 ## API Endpoints
 
 - `GET /api/health` - Health check with DB and FTS status
