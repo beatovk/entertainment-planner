@@ -14,6 +14,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 from packages.search.provider import LocalSearchProvider
 from cache import CacheManager
 from middleware import TimingMiddleware, log_operation
+from settings import settings
 
 app = FastAPI(title="Entertainment Planner API")
 
@@ -21,9 +22,8 @@ app = FastAPI(title="Entertainment Planner API")
 app.add_middleware(TimingMiddleware)
 
 # Initialize search provider and cache manager
-db_path = os.path.join(os.path.dirname(__file__), '..', '..', 'clean.db')
-search_provider = LocalSearchProvider(db_path)
-cache_manager = CacheManager(db_path)
+search_provider = LocalSearchProvider(settings.db_path)
+cache_manager = CacheManager(settings.db_path)
 
 # Feedback model
 class FeedbackRequest(BaseModel):
@@ -51,8 +51,7 @@ def haversine_distance(lat1: float, lng1: float, lat2: float, lng2: float) -> fl
 def get_place_by_id(place_id: int) -> Optional[Dict]:
     """Fetch place by ID from clean.places"""
     try:
-        db_path = os.path.join(os.path.dirname(__file__), '..', '..', 'clean.db')
-        conn = sqlite3.connect(db_path)
+        conn = sqlite3.connect(settings.db_path)
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -203,8 +202,7 @@ async def health_check():
     # Check database connectivity
     db_status = "up"
     try:
-        db_path = os.path.join(os.path.dirname(__file__), '..', '..', 'clean.db')
-        conn = sqlite3.connect(db_path)
+        conn = sqlite3.connect(settings.db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM places")
         conn.close()
@@ -214,8 +212,7 @@ async def health_check():
     # Check FTS status
     fts_status = "up"
     try:
-        db_path = os.path.join(os.path.dirname(__file__), '..', '..', 'clean.db')
-        conn = sqlite3.connect(db_path)
+        conn = sqlite3.connect(settings.db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM fts_places")
         conn.close()
@@ -288,8 +285,7 @@ async def recommend_places(
     # Fetch full place data
     candidates = []
     try:
-        db_path = os.path.join(os.path.dirname(__file__), '..', '..', 'clean.db')
-        conn = sqlite3.connect(db_path)
+        conn = sqlite3.connect(settings.db_path)
         cursor = conn.cursor()
         
         placeholders = ','.join(['?' for _ in all_candidates])
@@ -458,8 +454,7 @@ async def warm_cache(
                     
                     # Fetch full place data
                     candidates = []
-                    db_path = os.path.join(os.path.dirname(__file__), '..', '..', 'clean.db')
-                    conn = sqlite3.connect(db_path)
+                    conn = sqlite3.connect(settings.db_path)
                     cursor = conn.cursor()
                     
                     if all_candidates:
@@ -560,8 +555,7 @@ async def submit_feedback(feedback: FeedbackRequest):
         log_operation("feedback_submit", route_ids=feedback.route, useful=feedback.useful, has_note=bool(feedback.note))
         
         # Store feedback in database
-        db_path = os.path.join(os.path.dirname(__file__), '..', '..', 'clean.db')
-        conn = sqlite3.connect(db_path)
+        conn = sqlite3.connect(settings.db_path)
         cursor = conn.cursor()
         
         # Create feedback table if it doesn't exist
