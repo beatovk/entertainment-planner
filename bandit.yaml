@@ -1,0 +1,6 @@
+exclude_dirs:
+  - apps/ui
+  - apps/api/tests
+  - apps/ingest/tests
+skips:
+  - B101
