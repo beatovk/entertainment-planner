@@ -1,0 +1,23 @@
+name: tests
+on: [push, pull_request]
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: Install uv
+        run: pipx install uv
+      - name: Install deps
+        env:
+          PIP_INDEX_URL: https://pypi.org/simple
+          # HTTP_PROXY: ${{ secrets.HTTP_PROXY }}
+          # HTTPS_PROXY: ${{ secrets.HTTPS_PROXY }}
+        run: |
+          uv pip install -r requirements.txt
+          uv pip install -r requirements-dev.txt || true
+      - name: Run tests
+        run: pytest -q
