@@ -1,8 +1,10 @@
 import sqlite3
+from pathlib import Path
+
 from packages.search.provider import LocalSearchProvider
 
 
-def test_knn_returns_deterministic_order(tmp_path):
+def test_knn_returns_deterministic_order(tmp_path: Path) -> None:
     """kNN search should return deterministic ordering."""
     db_path = tmp_path / "search.db"
     provider = LocalSearchProvider(str(db_path))

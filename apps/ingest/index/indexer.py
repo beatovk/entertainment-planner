@@ -2,15 +2,19 @@
 Search Indexer
 Builds FTS5 and embedding indices from clean.places
 """
-import sqlite3
+from __future__ import annotations
+
 import json
-from typing import List, Dict, Optional
-from pathlib import Path
+import sqlite3
+from typing import Any, Dict, List, Optional, Tuple, cast  # noqa: F401
+
+from packages.search.provider import LocalSearchProvider
+
 
 class SearchIndexer:
     """Builds search indices from clean.places"""
     
-    def __init__(self, clean_db: str = "clean.db"):
+    def __init__(self, clean_db: str = "clean.db") -> None:
         self.clean_db = clean_db
     
     def get_places_for_indexing(self) -> List[Dict]:
@@ -56,12 +60,12 @@ class SearchIndexer:
                 tags = json.loads(place['tags_json'])
                 if isinstance(tags, list):
                     text_parts.extend(tags)
-            except:
+            except Exception:
                 pass
         
         return " ".join(text_parts)
     
-    def clear_indices(self):
+    def clear_indices(self) -> None:
         """Clear existing FTS5 and embeddings indices"""
         conn = sqlite3.connect(self.clean_db)
         cursor = conn.cursor()
@@ -88,10 +92,6 @@ class SearchIndexer:
         print(f"📥 Found {len(places)} places to index")
         
         # Import search provider
-        import sys
-        sys.path.insert(0, str(Path(__file__).parent.parent.parent / 'packages' / 'search'))
-        import sys; sys.path.append("."); from packages.search.provider import LocalSearchProvider
-        
         provider = LocalSearchProvider(self.clean_db)
         
         indexed_count = 0
@@ -144,7 +144,7 @@ class SearchIndexer:
             'embeddings_count': embeddings_count
         }
 
-def main():
+def main() -> None:
     """CLI entry point for testing"""
     indexer = SearchIndexer()
     
@@ -154,10 +154,10 @@ def main():
     # Verify indices
     verification = indexer.verify_indices()
     
-    print(f"\n📊 Indexing Results:")
+    print("\n📊 Indexing Results:")
     print(f"   Places processed: {results['total_places']}")
     print(f"   Places indexed: {results['indexed_count']}")
-    print(f"\n🔍 Index Verification:")
+    print("\n🔍 Index Verification:")
     print(f"   Places in DB: {verification['places_count']}")
     print(f"   FTS entries: {verification['fts_count']}")
     print(f"   Embeddings: {verification['embeddings_count']}")

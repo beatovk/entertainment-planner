@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional
 
+
 @dataclass
 class EntertainmentItem:
     """Placeholder for entertainment item model"""

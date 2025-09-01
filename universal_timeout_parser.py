@@ -4,15 +4,16 @@ Universal TimeOut parser that can handle different types of articles
 and extract all places from various TimeOut URLs.
 """
 
-import requests
-from bs4 import BeautifulSoup
+import json
+import logging
 import re
 import sqlite3
-import json
 from datetime import datetime
+from typing import Dict, List, Optional, Tuple
 from urllib.parse import urljoin, urlparse
-import logging
-from typing import List, Dict, Optional, Tuple
+
+import requests
+from bs4 import BeautifulSoup
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
@@ -446,7 +447,7 @@ class UniversalTimeOutIntegration:
             print(f"🎉 Успешно обработано {len(places)} мест из статьи")
             return True
         else:
-            print(f"❌ Ошибка сохранения мест из статьи")
+            print("❌ Ошибка сохранения мест из статьи")
             return False
 
 def main():
@@ -500,7 +501,7 @@ def main():
         
         print(f"📊 Статистика по статье: {len(places)} мест")
     
-    print(f"\n🎉 ОБРАБОТКА ЗАВЕРШЕНА!")
+    print("\n🎉 ОБРАБОТКА ЗАВЕРШЕНА!")
     print(f"📊 Всего статей обработано: {successful_articles}/{len(urls)}")
     print(f"🎯 Всего мест найдено: {total_places}")
     
@@ -517,7 +518,7 @@ def main():
     conn.close()
     
     print(f"💾 Всего мест в базе данных: {total_in_db}")
-    print(f"\n📊 Статистика по источникам:")
+    print("\n📊 Статистика по источникам:")
     for source, count in sources_stats:
         print(f"   {source}: {count} мест")
 

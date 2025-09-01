@@ -1,7 +1,10 @@
-import time
+from __future__ import annotations
+
 import json
 import logging
-from typing import Callable, Dict, Any
+import time
+from typing import Any, Callable, Dict, List, Optional, Tuple, cast  # noqa: F401
+
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
@@ -26,13 +29,6 @@ class TimingMiddleware(BaseHTTPMiddleware):
         op = request.url.path
         if op.startswith('/api/'):
             op = op[5:]  # Remove /api/ prefix
-        
-        # Initialize timing data
-        timing_data = {
-            'op': op,
-            'method': request.method,
-            'start_time': start_time
-        }
         
         # Process request
         response = await call_next(request)
@@ -72,11 +68,11 @@ class TimingMiddleware(BaseHTTPMiddleware):
         
         return response
 
-def log_operation(operation: str, **kwargs):
+def log_operation(operation: str, **kwargs: Any) -> None:
     """Helper function to log operations with structured data"""
     log_data = {
         'op': operation,
         'timestamp': time.time(),
-        **kwargs
+        **kwargs,
     }
     logger.info(json.dumps(log_data))

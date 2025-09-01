@@ -1,0 +1,16 @@
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = [
+  "apps/ui", "node_modules", "dist", "build", ".venv", ".pytest_cache",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = [
+  "E203",  # совместимость с black, если используешь
+  "E501",  # длинные строки
+]
+
+[tool.ruff.lint.per-file-ignores]
+"**/__init__.py" = ["F401"]

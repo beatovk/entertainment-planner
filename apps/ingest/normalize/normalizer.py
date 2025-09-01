@@ -4,15 +4,18 @@ Place Normalizer
 Cleans text, generates summaries, proposes tags/vibes via ontology, computes quality scores
 """
 import argparse
-import sqlite3
 import json
-import yaml
 import re
+import sqlite3
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Optional, Tuple
-from dataclasses import dataclass
+from typing import Dict, List
+
+import yaml
+
 from logger import logger
+
 
 @dataclass
 class NormalizationResult:
@@ -82,7 +85,7 @@ class PlaceNormalizer:
         try:
             if raw_json:
                 raw_data = json.loads(raw_json)
-        except:
+        except Exception:
             pass
         
         # Combine all text for analysis
@@ -192,7 +195,7 @@ class PlaceNormalizer:
                 freshness_score = max(0.0, 1.0 - (days_old / 365.0))
             else:
                 freshness_score = 0.5
-        except:
+        except Exception:
             freshness_score = 0.5
         
         # Weighted combination

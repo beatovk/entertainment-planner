@@ -1,27 +1,24 @@
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import JSONResponse
-from fastapi import Request
-from pydantic import BaseModel
-from typing import List, Dict, Optional
-import sqlite3
+from __future__ import annotations
+
 import json
-import time
 import math
+import sqlite3
+import time
 from datetime import datetime
 from pathlib import Path
-import sys
-import os
+from typing import Any, Dict, List, Optional, Tuple, cast  # noqa: F401
 
-# Make ingest and root modules importable
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
-from ingest.db_init import init_clean_db, seed_mock_data
+from apps.api.settings import settings
+from apps.ingest.db_init import init_clean_db, seed_mock_data
+from logger import logger
 from packages.search.provider import LocalSearchProvider
+
 from .cache import CacheManager
 from .middleware import TimingMiddleware, log_operation
-from settings import settings
-from logger import logger
 
 app = FastAPI(title="Entertainment Planner API")
 
@@ -37,7 +34,7 @@ if not db_file.exists():
 
 # Initialize search provider and cache manager
 search_provider = LocalSearchProvider(settings.db_path)
-cache_manager = CacheManager(settings.db_path)
+cache_manager = CacheManager(sqlite_db_path=settings.db_path)
 
 # Feedback model
 class FeedbackRequest(BaseModel):
@@ -62,7 +59,7 @@ def haversine_distance(lat1: float, lng1: float, lat2: float, lng2: float) -> fl
     
     return R * c
 
-def get_place_by_id(place_id: int) -> Optional[Dict]:
+def get_place_by_id(place_id: int) -> Optional[Dict[str, Any]]:
     """Fetch place by ID from clean.places"""
     try:
         with sqlite3.connect(settings.db_path) as conn:
@@ -105,8 +102,13 @@ def get_place_by_id(place_id: int) -> Optional[Dict]:
         logger.error(f"Error fetching place {place_id}: {e}")
         return None
 
-def build_route(candidates: List[Dict], start_lat: float, start_lng: float, 
-                min_distance: float = 300, max_distance: float = 1200) -> Dict:
+def build_route(
+    candidates: List[Dict[str, Any]],
+    start_lat: float,
+    start_lng: float,
+    min_distance: float = 300,
+    max_distance: float = 1200,
+) -> Optional[Dict[str, Any]]:
     """Build 3-step route using greedy approach by geo proximity"""
     if len(candidates) < 3:
         return None
@@ -150,7 +152,7 @@ def build_route(candidates: List[Dict], start_lat: float, start_lng: float,
                     break
     
     # Calculate total distance
-    total_distance = 0
+    total_distance: float = 0.0
     for i in range(len(route) - 1):
         total_distance += haversine_distance(
             route[i]['lat'], route[i]['lng'],
@@ -163,8 +165,12 @@ def build_route(candidates: List[Dict], start_lat: float, start_lng: float,
         'fit_score': 0.0  # Will be calculated later
     }
 
-def calculate_fit_score(route: Dict, candidates: List[Dict], 
-                       vibe: str, intents: List[str]) -> float:
+def calculate_fit_score(
+    route: Dict[str, Any],
+    candidates: List[Dict[str, Any]],
+    vibe: str,
+    intents: List[str],
+) -> float:
     """Calculate fit score: 0.5*match + 0.25*geo + 0.15*rating + 0.1*diversity"""
     if not route or not candidates:
         return 0.0
@@ -208,7 +214,7 @@ def calculate_fit_score(route: Dict, candidates: List[Dict],
     return round(fit_score, 3)
 
 @app.get("/api/health")
-async def health_check():
+async def health_check() -> JSONResponse:
     """Health check endpoint"""
     start_time = time.time()
     
@@ -245,38 +251,34 @@ async def recommend_places(
     vibe: str = Query(..., description="Vibe preference"),
     intents: str = Query(..., description="Comma-separated intents"),
     lat: float = Query(..., description="Starting latitude"),
-    lng: float = Query(..., description="Starting longitude")
-):
+    lng: float = Query(..., description="Starting longitude"),
+) -> JSONResponse:
     """Recommend places based on vibe, intents, and location"""
     start_time = time.time()
     
-    # Build cache key
+    # Parse intents and build cache key
+    intent_list = [intent.strip() for intent in intents.split(',')]
     city = "bangkok"  # Default city
     day = datetime.now().strftime("%Y-%m-%d")  # Current day
-    cache_key = cache_manager.build_cache_key(city, day, vibe, intents, lat, lng)
-    
+    cache_key = cache_manager.build_cache_key(city, day, vibe, intent_list, lat, lng)
+
     # Try to get from cache
     cached_result, cache_status, cache_store = cache_manager.get(cache_key)
-    
-    if cache_status in ["HIT", "MISS"]:
-        # Cache hit or miss, return cached result or compute
-        if cache_status == "HIT":
-            # Return cached result
-            response_time = round((time.time() - start_time) * 1000, 2)
-            
-            return JSONResponse(
-                content=cached_result,
-                headers={
-                    "X-Search": "FTS+VEC",
-                    "X-Cache-Status": cache_status,
-                    "X-Cache-Store": cache_store,
-                    "X-Debug": f"time_ms={response_time};db=up;rank=recommend;cache={cache_status};store={cache_store}"
-                }
-            )
-    
+
+    if cache_status == "HIT":
+        response_time = round((time.time() - start_time) * 1000, 2)
+
+        return JSONResponse(
+            content=cached_result,
+            headers={
+                "X-Search": "FTS+VEC",
+                "X-Cache-Status": cache_status,
+                "X-Cache-Store": cache_store,
+                "X-Debug": f"time_ms={response_time};db=up;rank=recommend;cache={cache_status};store={cache_store}"
+            }
+        )
+
     # Cache miss, compute recommendation
-    # Parse intents
-    intent_list = [intent.strip() for intent in intents.split(',')]
 
     # Build search query
     search_terms = [vibe] + intent_list
@@ -352,9 +354,6 @@ async def recommend_places(
             if (candidate['id'] != current_step2 and 
                 candidate['id'] not in route['steps']):
                 # Check if it's a good alternative (similar tags, different from step 1 and 3)
-                step1_tags = next(c['tags_json'] for c in candidates if c['id'] == route['steps'][0])
-                step3_tags = next(c['tags_json'] for c in candidates if c['id'] == route['steps'][2])
-                
                 candidate_tags = candidate['tags_json']
                 
                 # Calculate similarity to step 2
@@ -395,7 +394,7 @@ async def recommend_places(
     )
 
 @app.get("/api/places/{place_id}")
-async def get_place(place_id: int):
+async def get_place(place_id: int) -> JSONResponse:
     """Get place by ID"""
     start_time = time.time()
     
@@ -419,8 +418,8 @@ async def warm_cache(
     day: str = Query(..., description="Date for warming cache (YYYY-MM-DD)"),
     combos: str = Query(..., description="Vibe:intent1,intent2,intent3|vibe2:intent4,intent5,intent6"),
     lat: Optional[float] = Query(13.7563, description="Default latitude (Bangkok center)"),
-    lng: Optional[float] = Query(100.5018, description="Default longitude (Bangkok center)")
-):
+    lng: Optional[float] = Query(100.5018, description="Default longitude (Bangkok center)"),
+) -> JSONResponse:
     """
     Warm up cache with precomputed recommendations
     
@@ -430,7 +429,12 @@ async def warm_cache(
     Uses default Bangkok coordinates if lat/lng not provided
     """
     start_time = time.time()
-    
+
+    if lat is None or lng is None:
+        raise HTTPException(status_code=400, detail="lat/lng required for this operation")
+    lat = float(lat)
+    lng = float(lng)
+
     try:
         warmed_count = 0
         warmed_keys = []
@@ -445,18 +449,17 @@ async def warm_cache(
             vibe_part, intents_part = combo.split(':', 1)
             vibe = vibe_part.strip()
             intents = intents_part.strip()
-            
+            intent_list = [intent.strip() for intent in intents.split(',')]
+
             # Build cache key
-            cache_key = cache_manager.build_cache_key(city, day, vibe, intents, lat, lng)
-            
+            cache_key = cache_manager.build_cache_key(city, day, vibe, intent_list, lat, lng)
+
             # Check if already cached
             cached_value, cache_status, cache_store = cache_manager.get(cache_key)
-            
+
             if cache_status == "MISS":
                 # Precompute recommendation
                 try:
-                    # Parse intents
-                    intent_list = [intent.strip() for intent in intents.split(',')]
                     
                     # Build search query
                     search_terms = [vibe] + intent_list
@@ -567,7 +570,7 @@ async def warm_cache(
         raise HTTPException(status_code=500, detail=f"Cache warming failed: {str(e)}")
 
 @app.post("/api/feedback")
-async def submit_feedback(feedback: FeedbackRequest):
+async def submit_feedback(feedback: FeedbackRequest) -> JSONResponse:
     """Submit feedback about a route"""
     start_time = time.time()
     

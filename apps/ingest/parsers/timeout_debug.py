@@ -2,11 +2,16 @@
 """
 Debug script to analyze TimeOut Bangkok HTML structure
 """
-import requests
-from bs4 import BeautifulSoup
-import json
+from __future__ import annotations
 
-def analyze_timeout_structure():
+import re
+from typing import Any, Callable, List, Optional  # noqa: F401
+
+import requests
+from bs4 import BeautifulSoup, Tag
+
+
+def analyze_timeout_structure() -> None:
     """Analyze the HTML structure of TimeOut Bangkok page"""
     url = "https://www.timeout.com/bangkok/restaurants/bangkoks-best-new-cafes-of-2025"
     
@@ -26,9 +31,11 @@ def analyze_timeout_structure():
         
         # Look for different types of content containers
         print("\n1️⃣ Looking for numbered list items:")
-        numbered_items = soup.find_all(['li', 'div'], string=lambda text: text and re.match(r'^\d+\.', text.strip()))
+        numbered_items: List[Tag] = soup.find_all(
+            ["li", "div"], string=lambda text: bool(text) and bool(re.match(r"^\d+\.\s", text.strip()))
+        )
         print(f"   Found {len(numbered_items)} numbered items")
-        
+
         if numbered_items:
             print("   First few items:")
             for i, item in enumerate(numbered_items[:3]):
@@ -53,26 +60,27 @@ def analyze_timeout_structure():
         print(f"   Found {len(place_containers)} potential place containers")
         
         print("\n5️⃣ Analyzing first numbered item structure:")
-        if numbered_items:
-            first_item = numbered_items[0]
+        first_item = numbered_items[0] if numbered_items else None
+        if isinstance(first_item, Tag):
             print(f"   Item tag: {first_item.name}")
             print(f"   Item classes: {first_item.get('class', [])}")
             print(f"   Item text: {first_item.get_text(strip=True)[:200]}")
-            
+
             # Look at siblings and children
             print(f"   Children count: {len(first_item.find_all())}")
-            print(f"   Next sibling: {first_item.find_next_sibling().name if first_item.find_next_sibling() else 'None'}")
-            
+            sib = first_item.find_next_sibling()
+            print(f"   Next sibling: {sib.name if isinstance(sib, Tag) else 'None'}")
+
             # Look for paragraphs in the same container
-            paragraphs = first_item.find_all('p')
+            paragraphs: List[Tag] = first_item.find_all('p')
             print(f"   Paragraphs in item: {len(paragraphs)}")
             for i, p in enumerate(paragraphs):
                 print(f"     {i+1}. {p.get_text(strip=True)[:100]}")
-            
+
             # Look for paragraphs in parent container
             parent = first_item.parent
-            if parent:
-                parent_paragraphs = parent.find_all('p')
+            if isinstance(parent, Tag):
+                parent_paragraphs: List[Tag] = parent.find_all('p')
                 print(f"   Paragraphs in parent: {len(parent_paragraphs)}")
                 for i, p in enumerate(parent_paragraphs[:3]):
                     print(f"     {i+1}. {p.get_text(strip=True)[:100]}")
@@ -109,11 +117,10 @@ def analyze_timeout_structure():
         # Save HTML for manual inspection
         with open('timeout_debug.html', 'w', encoding='utf-8') as f:
             f.write(str(soup))
-        print(f"\n💾 Saved HTML to timeout_debug.html for manual inspection")
+        print("\n💾 Saved HTML to timeout_debug.html for manual inspection")
         
     except Exception as e:
         print(f"❌ Error: {e}")
 
 if __name__ == "__main__":
-    import re
     analyze_timeout_structure()

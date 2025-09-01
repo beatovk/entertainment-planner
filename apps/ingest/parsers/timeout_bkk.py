@@ -3,16 +3,20 @@
 TimeOut Bangkok Parser
 Extracts entertainment places from TimeOut Bangkok and inserts into raw.db
 """
+from __future__ import annotations
+
 import argparse
 import json
+import re
 import sqlite3
-import requests
+import time
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Optional
-import re
-from bs4 import BeautifulSoup
-import time
+from typing import Any, Dict, List, Optional
+
+import requests
+from bs4 import BeautifulSoup, Tag
+
 
 class TimeOutBkkParser:
     """Parser for TimeOut Bangkok entertainment listings"""
@@ -25,7 +29,7 @@ class TimeOutBkkParser:
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         })
         
-    def fetch_real_data(self, url: str, limit: int = 10) -> List[Dict]:
+    def fetch_real_data(self, url: str, limit: int = 10) -> List[Dict[str, Any]]:
         """Fetch real data from TimeOut Bangkok URL"""
         try:
             print(f"🌐 Fetching data from: {url}")
@@ -67,7 +71,7 @@ class TimeOutBkkParser:
             print(f"❌ Error fetching data: {e}")
             return []
     
-    def _extract_place_data(self, item, soup) -> Optional[Dict]:
+    def _extract_place_data(self, item: Tag, soup: BeautifulSoup) -> Optional[Dict[str, Any]]:
         """Extract place data from a heading item"""
         try:
             # Get the text content
@@ -85,23 +89,25 @@ class TimeOutBkkParser:
             address_raw = ""
             
             # Strategy: Look for content after this heading until the next heading
-            current_element = item
+            current_element: Tag = item
             content_text = ""
-            
+
             # Collect text from next siblings until we hit another heading
-            while current_element.find_next_sibling():
+            while True:
                 next_element = current_element.find_next_sibling()
-                
+                if not isinstance(next_element, Tag):
+                    break
+
                 # Stop if we hit another heading
                 if next_element.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
                     break
-                
+
                 # Collect text content
                 if next_element.name == 'p':
                     content_text += " " + next_element.get_text(strip=True)
                 elif next_element.get_text(strip=True):
                     content_text += " " + next_element.get_text(strip=True)
-                
+
                 current_element = next_element
             
             # Extract description (first meaningful paragraph)
@@ -130,17 +136,20 @@ class TimeOutBkkParser:
             
             # Look for images in the same section
             current_element = item
-            while current_element.find_next_sibling():
+            while True:
                 next_element = current_element.find_next_sibling()
+                if not isinstance(next_element, Tag):
+                    break
                 if next_element.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
                     break
-                
+
                 img_element = next_element.find('img')
-                if img_element:
-                    image_url = img_element.get('src') or img_element.get('data-src')
-                    if image_url and not image_url.endswith('loading_icon.gif'):
+                if isinstance(img_element, Tag):
+                    src = img_element.get('src') or img_element.get('data-src')
+                    if isinstance(src, str) and not src.endswith('loading_icon.gif'):
+                        image_url = src
                         break
-                
+
                 current_element = next_element
             
             # Look for additional metadata
@@ -195,7 +204,7 @@ class TimeOutBkkParser:
             print(f"    Error in _extract_place_data: {e}")
             return None
     
-    def fetch_mock_data(self, limit: int = 10) -> List[Dict]:
+    def fetch_mock_data(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Fetch mock TimeOut Bangkok data (simulates real HTTP requests)"""
         mock_data = [
             {
@@ -265,7 +274,7 @@ class TimeOutBkkParser:
         
         return mock_data[:limit]
     
-    def insert_raw_places(self, data: List[Dict]) -> int:
+    def insert_raw_places(self, data: List[Dict[str, Any]]) -> int:
         """Insert raw places data into raw.db with deduplication"""
         inserted_count = 0
 
@@ -299,7 +308,7 @@ class TimeOutBkkParser:
 
         return inserted_count
     
-    def run(self, limit: int = 10, url: str = None, use_real: bool = False) -> int:
+    def run(self, limit: int = 10, url: Optional[str] = None, use_real: bool = False) -> int:
         """Main parser execution"""
         print(f"🚀 TimeOut Bangkok Parser - fetching {limit} items...")
         
@@ -318,7 +327,7 @@ class TimeOutBkkParser:
         
         return inserted
 
-def main():
+def main() -> None:
     """CLI entry point"""
     parser = argparse.ArgumentParser(description="TimeOut Bangkok Parser")
     parser.add_argument("--limit", type=int, default=10, help="Number of items to fetch (default: 10)")
@@ -331,14 +340,13 @@ def main():
     # Ensure database exists
     if not Path(args.db).exists():
         print(f"❌ Database {args.db} not found. Run db_init.py first.")
-        return 1
+        return
     
     # Run parser
     parser_instance = TimeOutBkkParser(args.db)
     inserted = parser_instance.run(args.limit, args.url, args.real)
-    
+
     print(f"✅ Parser completed. {inserted} items inserted.")
-    return 0
 
 if __name__ == "__main__":
-    exit(main())
+    main()

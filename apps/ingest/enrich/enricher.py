@@ -3,8 +3,9 @@ Place Enricher Interface
 Enriches raw place data with additional information from external providers
 """
 from abc import ABC, abstractmethod
-from typing import Dict, Optional, Any
 from dataclasses import dataclass
+from typing import Optional
+
 
 @dataclass
 class EnrichmentResult:

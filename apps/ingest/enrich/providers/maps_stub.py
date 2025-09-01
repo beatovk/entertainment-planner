@@ -5,11 +5,14 @@ Deterministic fake enrichment data + real Google Maps web scraping with correct 
 import json
 import re
 import time
-import requests
 from typing import Dict, Optional
-from enricher import EnrichmentProvider, EnrichmentResult
+
+import requests
 from bs4 import BeautifulSoup
+from enricher import EnrichmentProvider, EnrichmentResult
+
 from logger import logger
+
 
 class GoogleMapsProvider(EnrichmentProvider):
     """Real Google Maps provider using web scraping with correct URL formats"""

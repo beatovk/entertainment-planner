@@ -3,9 +3,11 @@
 Simple test script to debug extraction logic
 """
 
+import re
+
 import requests
 from bs4 import BeautifulSoup
-import re
+
 
 def test_extraction():
     url = "https://www.timeout.com/bangkok/restaurants/bangkoks-best-new-cafes-of-2025"
@@ -59,7 +61,7 @@ def test_extraction():
             print(f"🏗️ Реальный контейнер плитки: <{actual_tile_container.name}> class='{actual_tile_container.get('class', [])}'")
             
             # Look for content in the actual tile container
-            print(f"\n📄 ПОИСК КОНТЕНТА В РЕАЛЬНОМ КОНТЕЙНЕРЕ:")
+            print("\n📄 ПОИСК КОНТЕНТА В РЕАЛЬНОМ КОНТЕЙНЕРЕ:")
             content_elements = actual_tile_container.find_all(['p', 'div', 'img', 'a'])
             print(f"   Найдено элементов: {len(content_elements)}")
             
@@ -73,9 +75,9 @@ def test_extraction():
                 # Look for specific patterns
                 if elem.name == 'p':
                     if 'address' in elem_text.lower():
-                        print(f"      🏠 ПОТЕНЦИАЛЬНЫЙ АДРЕС!")
+                        print("      🏠 ПОТЕНЦИАЛЬНЫЙ АДРЕС!")
                     elif len(elem_text) > 50:
-                        print(f"      📝 ПОТЕНЦИАЛЬНОЕ ОПИСАНИЕ!")
+                        print("      📝 ПОТЕНЦИАЛЬНОЕ ОПИСАНИЕ!")
                 
                 if elem.name == 'img':
                     src = elem.get('src', '')
@@ -95,9 +97,9 @@ def test_extraction():
                     print(f"   {i}. '{text[:100]}...'")
                     
                     if text.lower().startswith('address'):
-                        print(f"      🏠 ЭТО АДРЕС!")
+                        print("      🏠 ЭТО АДРЕС!")
                     elif len(text) > 30:
-                        print(f"      📝 ЭТО ОПИСАНИЕ!")
+                        print("      📝 ЭТО ОПИСАНИЕ!")
             else:
                 print("\n❌ Контейнер описания не найден")
             
