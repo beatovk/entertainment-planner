@@ -29,37 +29,40 @@ class UniversalTimeOutParser:
         """Parse any TimeOut article and extract places"""
         try:
             print(f"\n🔍 Парсинг статьи: {url}")
-            response = self.session.get(url)
+            response = self.session.get(url, timeout=30)
             response.raise_for_status()
             soup = BeautifulSoup(response.content, 'html.parser')
-            
+
             # Determine article type and extract places accordingly
             places = []
-            
+
             # Method 1: Look for numbered headings (like the cafes article)
             numbered_places = self._extract_numbered_places(soup, url)
             if numbered_places:
                 print(f"📝 Найдено пронумерованных мест: {len(numbered_places)}")
                 places.extend(numbered_places)
-            
+
             # Method 2: Look for unnumbered place headings
             unnumbered_places = self._extract_unnumbered_places(soup, url)
             if unnumbered_places:
                 print(f"📝 Найдено ненумерованных мест: {len(unnumbered_places)}")
                 places.extend(unnumbered_places)
-            
+
             # Method 3: Look for place names in article content
             content_places = self._extract_content_places(soup, url)
             if content_places:
                 print(f"📝 Найдено мест в контенте: {len(content_places)}")
                 places.extend(content_places)
-            
+
             # Remove duplicates based on name and address
             unique_places = self._remove_duplicates(places)
             print(f"🎯 Всего уникальных мест: {len(unique_places)}")
-            
+
             return unique_places
-            
+
+        except requests.Timeout:
+            print(f"⌛ Превышено время ожидания при запросе {url}")
+            return []
         except Exception as e:
             print(f"❌ Ошибка парсинга статьи {url}: {e}")
             return []
