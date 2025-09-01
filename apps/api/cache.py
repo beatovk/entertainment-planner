@@ -6,6 +6,7 @@ from typing import Any, Dict, Optional, Tuple
 from datetime import datetime, timedelta
 
 from settings import settings
+from logger import logger
 
 class MemoryTTLCache:
     """In-memory TTL cache using dictionary"""
@@ -71,7 +72,7 @@ class SQLiteCache:
 
                 conn.commit()
         except Exception as e:
-            print(f"Warning: Could not create cache table: {e}")
+            logger.warning(f"Could not create cache table: {e}")
     
     def get(self, key: str) -> Optional[Any]:
         """Get value from SQLite cache if not expired"""
@@ -105,7 +106,7 @@ class SQLiteCache:
             return json.loads(value_json)
             
         except Exception as e:
-            print(f"Warning: SQLite cache get error: {e}")
+            logger.warning(f"SQLite cache get error: {e}")
             return None
     
     def set(self, key: str, value: Any, ttl_days: int = 7) -> bool:
@@ -127,7 +128,7 @@ class SQLiteCache:
                 return True
             
         except Exception as e:
-            print(f"Warning: SQLite cache set error: {e}")
+            logger.warning(f"SQLite cache set error: {e}")
             return False
     
     def _remove_expired(self, key: str) -> None:
@@ -138,7 +139,7 @@ class SQLiteCache:
                 cursor.execute('DELETE FROM cache_entries WHERE key = ?', (key,))
                 conn.commit()
         except Exception as e:
-            print(f"Warning: Could not remove expired cache entry: {e}")
+            logger.warning(f"Could not remove expired cache entry: {e}")
     
     def cleanup_expired(self) -> int:
         """Clean up all expired entries, return count removed"""
@@ -163,7 +164,7 @@ class SQLiteCache:
             return len(expired_keys)
             
         except Exception as e:
-            print(f"Warning: Cache cleanup error: {e}")
+            logger.warning(f"Cache cleanup error: {e}")
             return 0
 
 class CacheManager:
@@ -205,7 +206,7 @@ class CacheManager:
         try:
             self.sqlite_cache.set(key, value, ttl)
         except Exception as e:
-            print(f"Warning: Could not persist to SQLite cache: {e}")
+            logger.warning(f"Could not persist to SQLite cache: {e}")
     
     def build_cache_key(self, city: str, day: str, vibe: str, intents: str, 
                        lat: float, lng: float) -> str:

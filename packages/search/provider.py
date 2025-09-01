@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import List, Tuple, Optional
 import os
 import sqlite3
+from logger import logger
 
 class SearchProvider(ABC):
     """Abstract interface for search providers"""
@@ -94,7 +95,7 @@ class LocalSearchProvider(SearchProvider):
                 return True
             
         except Exception as e:
-            print(f"Error indexing doc {doc_id}: {e}")
+            logger.error(f"Error indexing doc {doc_id}: {e}")
             return False
     
     def knn(self, query_text: str, top_k: int) -> List[Tuple[int, float]]:
@@ -122,7 +123,7 @@ class LocalSearchProvider(SearchProvider):
                 return similarities[:top_k]
             
         except Exception as e:
-            print(f"Error in kNN search: {e}")
+            logger.error(f"Error in kNN search: {e}")
             return []
     
     def fts(self, query: str, top_k: int) -> List[Tuple[int, float]]:
@@ -144,5 +145,5 @@ class LocalSearchProvider(SearchProvider):
                 return [(doc_id, 1.0 / (rank + 1)) for doc_id, rank in results]
             
         except Exception as e:
-            print(f"Error in FTS search: {e}")
+            logger.error(f"Error in FTS search: {e}")
             return []

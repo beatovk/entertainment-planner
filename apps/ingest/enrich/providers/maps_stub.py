@@ -9,6 +9,7 @@ import requests
 from typing import Dict, Optional
 from enricher import EnrichmentProvider, EnrichmentResult
 from bs4 import BeautifulSoup
+from logger import logger
 
 class GoogleMapsProvider(EnrichmentProvider):
     """Real Google Maps provider using web scraping with correct URL formats"""
@@ -29,11 +30,11 @@ class GoogleMapsProvider(EnrichmentProvider):
         
         # Check cache first
         if cache_key in self.cache:
-            print(f"📋 Using cached data for: {name_raw}")
+            logger.info(f"📋 Using cached data for: {name_raw}")
             return self.cache[cache_key]
         
         try:
-            print(f"🔍 Enriching from Google Maps: {name_raw}")
+            logger.info(f"🔍 Enriching from Google Maps: {name_raw}")
             
             # Build search query
             search_query = f"{name_raw} {city}"
@@ -81,7 +82,7 @@ class GoogleMapsProvider(EnrichmentProvider):
             return result
             
         except Exception as e:
-            print(f"❌ Error enriching {name_raw}: {e}")
+            logger.error(f"❌ Error enriching {name_raw}: {e}")
             # Return fallback data
             return self._get_fallback_data(name_raw, city)
     
@@ -113,14 +114,14 @@ class GoogleMapsProvider(EnrichmentProvider):
             })
             
         except Exception as e:
-            print(f"⚠️ Error extracting place data: {e}")
+            logger.warning(f"⚠️ Error extracting place data: {e}")
         
         return place_data
     
     def _extract_first_place_link(self, soup: BeautifulSoup, name_raw: str) -> Optional[str]:
         """Extract place link using correct Google Maps URL formats based on ID type"""
         try:
-            print(f"🔍 Attempting to extract place link for: {name_raw}")
+            logger.info(f"🔍 Attempting to extract place link for: {name_raw}")
             
             # Extract data from HTML
             html_content = str(soup)
@@ -146,9 +147,9 @@ class GoogleMapsProvider(EnrichmentProvider):
                 # Remove duplicates and take the first one
                 unique_place_ids = list(set(place_id_matches))
                 place_data['place_id'] = unique_place_ids[0]
-                print(f"✅ Found Place ID: {unique_place_ids[0]}")
+                logger.info(f"✅ Found Place ID: {unique_place_ids[0]}")
                 if len(unique_place_ids) > 1:
-                    print(f"📝 Found multiple Place IDs: {unique_place_ids}")
+                    logger.info(f"📝 Found multiple Place IDs: {unique_place_ids}")
             
             # Look for numeric CID (digits only) - these are different from Place IDs
             # Try multiple patterns for finding numeric CIDs
@@ -170,9 +171,9 @@ class GoogleMapsProvider(EnrichmentProvider):
                 # Remove duplicates and take the first one
                 unique_cids = list(set(numeric_cid_matches))
                 place_data['numeric_cid'] = unique_cids[0]
-                print(f"✅ Found numeric CID: {unique_cids[0]}")
+                logger.info(f"✅ Found numeric CID: {unique_cids[0]}")
                 if len(unique_cids) > 1:
-                    print(f"📝 Found multiple CIDs: {unique_cids}")
+                    logger.info(f"📝 Found multiple CIDs: {unique_cids}")
             
             # Look for coordinates
             coord_matches = re.findall(r'@([-\d.]+),([-\d.]+)', html_content)
@@ -184,7 +185,7 @@ class GoogleMapsProvider(EnrichmentProvider):
                         if 13.0 <= lat_val <= 14.0 and 100.0 <= lng_val <= 101.0:  # Bangkok area
                             place_data['lat'] = lat_val
                             place_data['lng'] = lng_val
-                            print(f"✅ Found coordinates: {lat_val}, {lng_val}")
+                            logger.info(f"✅ Found coordinates: {lat_val}, {lng_val}")
                             break
                     except ValueError:
                         continue
@@ -194,32 +195,32 @@ class GoogleMapsProvider(EnrichmentProvider):
             # Method 1: Place ID format (ChIJ strings) - use place_id parameter
             if place_data.get('place_id'):
                 place_id_url = f"https://www.google.com/maps/place/?q=place_id:{place_data['place_id']}"
-                print(f"✅ Generated Place ID URL: {place_id_url}")
+                logger.info(f"✅ Generated Place ID URL: {place_id_url}")
                 return place_id_url
             
             # Method 2: Numeric CID format (digits only) - use cid parameter
             if place_data.get('numeric_cid'):
                 numeric_cid_url = f"https://www.google.com/maps/?cid={place_data['numeric_cid']}"
-                print(f"✅ Generated numeric CID URL: {numeric_cid_url}")
+                logger.info(f"✅ Generated numeric CID URL: {numeric_cid_url}")
                 return numeric_cid_url
             
             # Method 3: Coordinate-based format (fallback when no IDs found)
             if place_data.get('lat') and place_data.get('lng'):
                 coord_url = f"https://www.google.com/maps/place/{name_raw.replace(' ', '+')}/@{place_data['lat']},{place_data['lng']},17z"
-                print(f"✅ Generated coordinate URL: {coord_url}")
+                logger.info(f"✅ Generated coordinate URL: {coord_url}")
                 return coord_url
             
             # Method 4: Universal search format (final fallback)
             search_url = f"https://www.google.com/maps/search/{name_raw.replace(' ', '+')}+Bangkok"
-            print(f"✅ Generated search URL: {search_url}")
+            logger.info(f"✅ Generated search URL: {search_url}")
             return search_url
-            
+
         except Exception as e:
-            print(f"⚠️ Error extracting place link: {e}")
-            
+            logger.warning(f"⚠️ Error extracting place link: {e}")
+
             # Fallback: simple search
             fallback_url = f"https://maps.google.com/maps?q={name_raw.replace(' ', '+')}+Bangkok"
-            print(f"⚠️ Using fallback URL: {fallback_url}")
+            logger.warning(f"⚠️ Using fallback URL: {fallback_url}")
             return fallback_url
     
     def _get_fallback_data(self, name_raw: str, city: str) -> EnrichmentResult:

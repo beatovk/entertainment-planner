@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass
 import openai
+from logger import logger
 
 @dataclass
 class SummarizationResult:
@@ -37,7 +38,7 @@ class GPTPlaceSummarizer:
             with open(path, 'r', encoding='utf-8') as f:
                 return yaml.safe_load(f)
         except FileNotFoundError:
-            print(f"⚠️  Ontology file {path} not found, using defaults")
+            logger.warning(f"⚠️  Ontology file {path} not found, using defaults")
             return {
                 'vibes': ['lazy', 'cozy', 'scenic', 'vibrant', 'classy', 'budget', 'premium', 'date', 'solo'],
                 'categories': ['food', 'coffee', 'bar', 'rooftop', 'park', 'gallery', 'live-music', 'night-market', 'cinema', 'workshop'],
@@ -88,7 +89,7 @@ Write your description:
             return summary
             
         except Exception as e:
-            print(f"❌ GPT API error: {e}")
+            logger.error(f"❌ GPT API error: {e}")
             # NO FALLBACK TO TRUNCATION - return error message
             return f"Error generating summary: {str(e)[:100]}"
     
@@ -373,27 +374,27 @@ class GPTSummarizationRunner:
     
     def run(self, limit: int) -> Dict[str, int]:
         """Main summarization process - ONLY generates summary_160"""
-        print(f"🚀 Starting GPT-4o mini summarization process for {limit} places...")
-        print(f"🎯 Focus: Generate ONLY beautiful 4-sentence summaries from full_description")
-        print(f"❌ NO TRUNCATION, NO SIMPLE RULES - ONLY GPT-4o mini")
+        logger.info(f"🚀 Starting GPT-4o mini summarization process for {limit} places...")
+        logger.info(f"🎯 Focus: Generate ONLY beautiful 4-sentence summaries from full_description")
+        logger.info(f"❌ NO TRUNCATION, NO SIMPLE RULES - ONLY GPT-4o mini")
         
         # Create pending_tags table
         self.create_pending_tags_table()
         
         # Get places to summarize
         places = self.get_places_to_summarize(limit)
-        print(f"📥 Found {len(places)} places to summarize")
+        logger.info(f"📥 Found {len(places)} places to summarize")
         
         if not places:
-            print("✅ All places already have proper GPT-generated summaries!")
+            logger.info("✅ All places already have proper GPT-generated summaries!")
             return {'total_places': 0, 'summarized_count': 0, 'pending_tags_count': 0}
         
         summarized_count = 0
         
         for place in places:
             try:
-                print(f"🤖 Processing: {place['name']}")
-                print(f"   📖 Full description: {place['full_description'][:100]}...")
+                logger.info(f"🤖 Processing: {place['name']}")
+                logger.info(f"   📖 Full description: {place['full_description'][:100]}...")
                 
                 # Summarize the place using GPT-4o mini ONLY
                 summarization = self.summarizer.summarize_place(place)
@@ -402,20 +403,20 @@ class GPTSummarizationRunner:
                 self.update_place(place['id'], summarization)
                 
                 summarized_count += 1
-                print(f"✅ Summarized: {place['name']}")
-                print(f"   📝 GPT Summary: {summarization.summary}")
-                print(f"   🏷️ Tags: {', '.join(summarization.tags)}")
-                print(f"   🎭 Vibe: {summarization.vibe}")
-                print(f"   📈 Quality: {summarization.quality_score}")
-                print()
+                logger.info(f"✅ Summarized: {place['name']}")
+                logger.info(f"   📝 GPT Summary: {summarization.summary}")
+                logger.info(f"   🏷️ Tags: {', '.join(summarization.tags)}")
+                logger.info(f"   🎭 Vibe: {summarization.vibe}")
+                logger.info(f"   📈 Quality: {summarization.quality_score}")
+                logger.info("")
                 
             except Exception as e:
-                print(f"❌ Error summarizing {place['name']}: {e}")
+                logger.error(f"❌ Error summarizing {place['name']}: {e}")
                 continue
         
         # Report pending tags
         if self.summarizer.pending_tags:
-            print(f"⚠️  Pending tags found: {', '.join(self.summarizer.pending_tags)}")
+            logger.warning(f"⚠️  Pending tags found: {', '.join(self.summarizer.pending_tags)}")
         
         return {
             'total_places': len(places),
@@ -434,23 +435,23 @@ def main():
     
     # Ensure database exists
     if not Path(args.clean_db).exists():
-        print(f"❌ Clean database {args.clean_db} not found. Run enrichment first.")
+        logger.error(f"❌ Clean database {args.clean_db} not found. Run enrichment first.")
         return 1
     
     # Run summarization
     try:
         runner = GPTSummarizationRunner(args.clean_db, args.api_key)
         results = runner.run(args.limit)
-        
-        print(f"\n✅ GPT-4o mini summarization completed!")
-        print(f"   Total places processed: {results['total_places']}")
-        print(f"   Places summarized: {results['summarized_count']}")
-        print(f"   Pending tags: {results['pending_tags_count']}")
+
+        logger.info("\n✅ GPT-4o mini summarization completed!")
+        logger.info(f"   Total places processed: {results['total_places']}")
+        logger.info(f"   Places summarized: {results['summarized_count']}")
+        logger.info(f"   Pending tags: {results['pending_tags_count']}")
         
         return 0
         
     except Exception as e:
-        print(f"❌ Error: {e}")
+        logger.error(f"❌ Error: {e}")
         return 1
 
 if __name__ == "__main__":

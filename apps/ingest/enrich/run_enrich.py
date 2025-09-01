@@ -12,6 +12,7 @@ from typing import List, Dict, Optional
 
 from enricher import PlaceEnricher
 from providers.maps_stub import GoogleMapsProvider, MapsStubProvider
+from logger import logger
 
 class EnrichmentRunner:
     """Runs the enrichment process"""
@@ -22,10 +23,10 @@ class EnrichmentRunner:
         
         # Choose provider based on preference
         if use_google_maps:
-            print("🔍 Using Google Maps provider for real-time enrichment")
+            logger.info("🔍 Using Google Maps provider for real-time enrichment")
             self.enricher = PlaceEnricher(GoogleMapsProvider())
         else:
-            print("📋 Using stub provider for testing")
+            logger.info("📋 Using stub provider for testing")
             self.enricher = PlaceEnricher(MapsStubProvider())
     
     def get_latest_raw_places(self, limit: int) -> List[Dict]:
@@ -157,7 +158,7 @@ class EnrichmentRunner:
                 inserted_count += 1
                 
             except Exception as e:
-                print(f"Error enriching {raw_place['name_raw']}: {e}")
+                logger.error(f"Error enriching {raw_place['name_raw']}: {e}")
                 continue
         
         conn.commit()
@@ -203,19 +204,19 @@ class EnrichmentRunner:
     
     def run(self, limit: int, city: str) -> Dict[str, int]:
         """Main enrichment process"""
-        print(f"🚀 Starting enrichment process for {limit} places in {city}...")
+        logger.info(f"🚀 Starting enrichment process for {limit} places in {city}...")
         
         # Get latest raw places
         raw_places = self.get_latest_raw_places(limit)
-        print(f"📥 Found {len(raw_places)} raw places to enrich")
+        logger.info(f"📥 Found {len(raw_places)} raw places to enrich")
         
         # Enrich and insert into buffer
         enriched_count = self.enrich_and_insert(raw_places, city)
-        print(f"💾 Enriched and inserted {enriched_count} places into clean_buffer")
+        logger.info(f"💾 Enriched and inserted {enriched_count} places into clean_buffer")
         
         # Upsert to places table
         upserted_count = self.upsert_to_places()
-        print(f"🔄 Upserted {upserted_count} places to clean.places")
+        logger.info(f"🔄 Upserted {upserted_count} places to clean.places")
         
         return {
             'raw_count': len(raw_places),
@@ -235,11 +236,11 @@ def main():
     
     # Ensure databases exist
     if not Path(args.raw_db).exists():
-        print(f"❌ Raw database {args.raw_db} not found. Run timeout parser first.")
+        logger.error(f"❌ Raw database {args.raw_db} not found. Run timeout parser first.")
         return 1
     
     if not Path(args.clean_db).exists():
-        print(f"❌ Clean database {args.clean_db} not found. Run db_init.py first.")
+        logger.error(f"❌ Clean database {args.clean_db} not found. Run db_init.py first.")
         return 1
     
     # Determine provider based on arguments
@@ -249,10 +250,10 @@ def main():
     runner = EnrichmentRunner(args.raw_db, args.clean_db, use_google_maps)
     results = runner.run(args.limit, args.city)
     
-    print(f"\n✅ Enrichment completed!")
-    print(f"   Raw places processed: {results['raw_count']}")
-    print(f"   Places enriched: {results['enriched_count']}")
-    print(f"   Places upserted: {results['upserted_count']}")
+    logger.info("\n✅ Enrichment completed!")
+    logger.info(f"   Raw places processed: {results['raw_count']}")
+    logger.info(f"   Places enriched: {results['enriched_count']}")
+    logger.info(f"   Places upserted: {results['upserted_count']}")
     
     return 0
 
