@@ -8,9 +8,15 @@ import json
 import time
 import math
 from datetime import datetime
+from pathlib import Path
 import sys
 import os
+
+# Make ingest and root modules importable
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+
+from ingest.db_init import init_clean_db, seed_mock_data
 from packages.search.provider import LocalSearchProvider
 from cache import CacheManager
 from middleware import TimingMiddleware, log_operation
@@ -20,6 +26,13 @@ app = FastAPI(title="Entertainment Planner API")
 
 # Add timing middleware
 app.add_middleware(TimingMiddleware)
+
+# Ensure database exists with seed data
+db_file = Path(settings.db_path)
+if not db_file.exists():
+    db_file.parent.mkdir(parents=True, exist_ok=True)
+    init_clean_db(db_file)
+    seed_mock_data(db_file)
 
 # Initialize search provider and cache manager
 search_provider = LocalSearchProvider(settings.db_path)

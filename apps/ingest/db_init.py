@@ -2,10 +2,18 @@ import sqlite3
 import json
 from datetime import datetime
 from pathlib import Path
+from typing import Union
 
-def init_raw_db():
-    """Initialize raw.db with raw_places table"""
-    conn = sqlite3.connect('raw.db')
+
+def init_raw_db(db_path: Union[str, Path] = "raw.db"):
+    """Initialize raw.db with raw_places table
+
+    Parameters
+    ----------
+    db_path:
+        Location of the raw database. Can be a string path or ``Path`` object.
+    """
+    conn = sqlite3.connect(str(db_path))
     cursor = conn.cursor()
     
     # Create raw_places table
@@ -31,11 +39,18 @@ def init_raw_db():
     
     conn.commit()
     conn.close()
-    print("✅ raw.db initialized with raw_places table")
+    print(f"✅ {db_path} initialized with raw_places table")
 
-def init_clean_db():
-    """Initialize clean.db with places, embeddings, and FTS5 tables"""
-    conn = sqlite3.connect('clean.db')
+
+def init_clean_db(db_path: Union[str, Path] = "clean.db"):
+    """Initialize clean.db with places, embeddings, and FTS5 tables
+
+    Parameters
+    ----------
+    db_path:
+        Location of the clean database. Can be a string path or ``Path`` object.
+    """
+    conn = sqlite3.connect(str(db_path))
     cursor = conn.cursor()
     
     # Create places table
@@ -76,20 +91,27 @@ def init_clean_db():
     # Create FTS5 table
     cursor.execute('''
         CREATE VIRTUAL TABLE IF NOT EXISTS fts_places USING FTS5(
-            name, 
-            summary_160, 
-            tags, 
+            name,
+            summary_160,
+            tags,
             content=''
         )
     ''')
     
     conn.commit()
     conn.close()
-    print("✅ clean.db initialized with places, embeddings, and FTS5 tables")
+    print(f"✅ {db_path} initialized with places, embeddings, and FTS5 tables")
 
-def seed_mock_data():
-    """Seed clean.db with 3 mock Bangkok places"""
-    conn = sqlite3.connect('clean.db')
+
+def seed_mock_data(db_path: Union[str, Path] = "clean.db"):
+    """Seed clean.db with 3 mock Bangkok places
+
+    Parameters
+    ----------
+    db_path:
+        Location of the clean database to seed.
+    """
+    conn = sqlite3.connect(str(db_path))
     cursor = conn.cursor()
     
     mock_places = [
@@ -156,43 +178,49 @@ def seed_mock_data():
     ]
     
     for place in mock_places:
-        cursor.execute('''
+        cursor.execute(
+            '''
             INSERT INTO places (
                 name, summary_160, full_description, lat, lng, district, city,
                 price_level, rating, ratings_count, hours_json, phone, site,
                 gmap_url, photos_json, tags_json, vibe_json, quality_score
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            place['name'], place['summary_160'], place['full_description'],
-            place['lat'], place['lng'], place['district'], place['city'],
-            place['price_level'], place['rating'], place['ratings_count'],
-            place['hours_json'], place['phone'], place['site'],
-            place['gmap_url'], place['photos_json'], place['tags_json'],
-            place['vibe_json'], place['quality_score']
-        ))
-    
-    # Update FTS5 table
-    pass
-    cursor.execute('''
+            ''',
+            (
+                place['name'], place['summary_160'], place['full_description'],
+                place['lat'], place['lng'], place['district'], place['city'],
+                place['price_level'], place['rating'], place['ratings_count'],
+                place['hours_json'], place['phone'], place['site'],
+                place['gmap_url'], place['photos_json'], place['tags_json'],
+                place['vibe_json'], place['quality_score']
+            ),
+        )
+
+    # Update FTS5 table with all rows
+    cursor.execute('DELETE FROM fts_places')
+    cursor.execute(
+        '''
         INSERT INTO fts_places (name, summary_160, tags)
         SELECT name, summary_160, tags_json FROM places
-    ''')
+        '''
+    )
     
     conn.commit()
     conn.close()
-    print("✅ Mock data seeded into clean.db")
+    print(f"✅ Mock data seeded into {db_path}")
 
-def print_row_counts():
+
+def print_row_counts(raw_db_path: Union[str, Path] = "raw.db", clean_db_path: Union[str, Path] = "clean.db"):
     """Print row counts for verification"""
     # Raw DB counts
-    conn = sqlite3.connect('raw.db')
+    conn = sqlite3.connect(str(raw_db_path))
     cursor = conn.cursor()
     cursor.execute('SELECT COUNT(*) FROM raw_places')
     raw_count = cursor.fetchone()[0]
     conn.close()
     
     # Clean DB counts
-    conn = sqlite3.connect('clean.db')
+    conn = sqlite3.connect(str(clean_db_path))
     cursor = conn.cursor()
     cursor.execute('SELECT COUNT(*) FROM places')
     places_count = cursor.fetchone()[0]
@@ -203,29 +231,34 @@ def print_row_counts():
     conn.close()
     
     print(f"\n📊 Database Row Counts:")
-    print(f"raw.db - raw_places: {raw_count}")
-    print(f"clean.db - places: {places_count}")
-    print(f"clean.db - embeddings: {embeddings_count}")
-    print(f"clean.db - fts_places: {fts_count}")
+    print(f"{raw_db_path} - raw_places: {raw_count}")
+    print(f"{clean_db_path} - places: {places_count}")
+    print(f"{clean_db_path} - embeddings: {embeddings_count}")
+    print(f"{clean_db_path} - fts_places: {fts_count}")
 
-def main():
+
+def main(base_path: Union[str, Path] = "."):
     """Main initialization function"""
     print("🚀 Initializing Entertainment Planner Databases...")
-    
-    # Create databases directory if it doesn't exist
-    Path('.').mkdir(exist_ok=True)
-    
+
+    base = Path(base_path)
+    base.mkdir(parents=True, exist_ok=True)
+
+    raw_db = base / "raw.db"
+    clean_db = base / "clean.db"
+
     # Initialize databases
-    init_raw_db()
-    init_clean_db()
-    
+    init_raw_db(raw_db)
+    init_clean_db(clean_db)
+
     # Seed mock data
-    seed_mock_data()
-    
+    seed_mock_data(clean_db)
+
     # Print verification counts
-    print_row_counts()
-    
+    print_row_counts(raw_db, clean_db)
+
     print("\n✅ Database initialization complete!")
+
 
 if __name__ == "__main__":
     main()
