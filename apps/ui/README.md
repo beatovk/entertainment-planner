@@ -16,6 +16,15 @@ A React-based UI for the Entertainment Planner API with vibe selection and route
 - Node.js 16+ and npm
 - Entertainment Planner API running on port 8000
 
+## Setup
+
+Install dependencies:
+
+```bash
+cd apps/ui
+npm install
+```
+
 ## Quick Start
 
 ### 1. Start the API Server
