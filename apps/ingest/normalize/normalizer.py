@@ -12,6 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass
+from logger import logger
 
 @dataclass
 class NormalizationResult:
@@ -34,7 +35,7 @@ class PlaceNormalizer:
             with open(path, 'r', encoding='utf-8') as f:
                 return yaml.safe_load(f)
         except FileNotFoundError:
-            print(f"⚠️  Ontology file {path} not found, using defaults")
+            logger.warning(f"⚠️  Ontology file {path} not found, using defaults")
             return {
                 'vibes': ['lazy', 'cozy', 'scenic', 'vibrant', 'classy', 'budget', 'premium', 'date', 'solo'],
                 'categories': ['food', 'coffee', 'bar', 'rooftop', 'park', 'gallery', 'live-music', 'night-market', 'cinema', 'workshop'],
@@ -317,14 +318,14 @@ class NormalizationRunner:
     
     def run(self, limit: int) -> Dict[str, int]:
         """Main normalization process"""
-        print(f"🚀 Starting normalization process for {limit} places...")
+        logger.info(f"🚀 Starting normalization process for {limit} places...")
         
         # Create pending_tags table
         self.create_pending_tags_table()
         
         # Get places to normalize
         places = self.get_places_to_normalize(limit)
-        print(f"📥 Found {len(places)} places to normalize")
+        logger.info(f"📥 Found {len(places)} places to normalize")
         
         normalized_count = 0
         
@@ -337,15 +338,15 @@ class NormalizationRunner:
                 self.update_place(place['id'], normalization)
                 
                 normalized_count += 1
-                print(f"✅ Normalized: {place['name']} (quality: {normalization.quality_score})")
+                logger.info(f"✅ Normalized: {place['name']} (quality: {normalization.quality_score})")
                 
             except Exception as e:
-                print(f"❌ Error normalizing {place['name']}: {e}")
+                logger.error(f"❌ Error normalizing {place['name']}: {e}")
                 continue
         
         # Report pending tags
         if self.normalizer.pending_tags:
-            print(f"⚠️  Pending tags found: {', '.join(self.normalizer.pending_tags)}")
+            logger.warning(f"⚠️  Pending tags found: {', '.join(self.normalizer.pending_tags)}")
         
         return {
             'total_places': len(places),
@@ -363,17 +364,17 @@ def main():
     
     # Ensure database exists
     if not Path(args.clean_db).exists():
-        print(f"❌ Clean database {args.clean_db} not found. Run enrichment first.")
+        logger.error(f"❌ Clean database {args.clean_db} not found. Run enrichment first.")
         return 1
     
     # Run normalization
     runner = NormalizationRunner(args.clean_db)
     results = runner.run(args.limit)
     
-    print(f"\n✅ Normalization completed!")
-    print(f"   Total places processed: {results['total_places']}")
-    print(f"   Places normalized: {results['normalized_count']}")
-    print(f"   Pending tags: {results['pending_tags_count']}")
+    logger.info("\n✅ Normalization completed!")
+    logger.info(f"   Total places processed: {results['total_places']}")
+    logger.info(f"   Places normalized: {results['normalized_count']}")
+    logger.info(f"   Pending tags: {results['pending_tags_count']}")
     
     return 0
 

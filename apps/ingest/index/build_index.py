@@ -6,6 +6,7 @@ Rebuilds all search indices from clean.places
 import argparse
 from pathlib import Path
 from indexer import SearchIndexer
+from logger import logger
 
 def main():
     """CLI entry point"""
@@ -17,7 +18,7 @@ def main():
     
     # Ensure database exists
     if not Path(args.clean_db).exists():
-        print(f"❌ Clean database {args.clean_db} not found. Run enrichment first.")
+        logger.error(f"❌ Clean database {args.clean_db} not found. Run enrichment first.")
         return 1
     
     # Build indices
@@ -27,14 +28,14 @@ def main():
     # Verify if requested
     if args.verify:
         verification = indexer.verify_indices()
-        print(f"\n🔍 Index Verification:")
-        print(f"   Places in DB: {verification['places_count']}")
-        print(f"   FTS entries: {verification['fts_count']}")
-        print(f"   Embeddings: {verification['embeddings_count']}")
+        logger.info("\n🔍 Index Verification:")
+        logger.info(f"   Places in DB: {verification['places_count']}")
+        logger.info(f"   FTS entries: {verification['fts_count']}")
+        logger.info(f"   Embeddings: {verification['embeddings_count']}")
     
-    print(f"\n✅ Index building completed!")
-    print(f"   Places processed: {results['total_places']}")
-    print(f"   Places indexed: {results['indexed_count']}")
+    logger.info("\n✅ Index building completed!")
+    logger.info(f"   Places processed: {results['total_places']}")
+    logger.info(f"   Places indexed: {results['indexed_count']}")
     
     return 0
 

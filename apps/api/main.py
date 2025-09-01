@@ -21,6 +21,7 @@ from packages.search.provider import LocalSearchProvider
 from .cache import CacheManager
 from .middleware import TimingMiddleware, log_operation
 from settings import settings
+from logger import logger
 
 app = FastAPI(title="Entertainment Planner API")
 
@@ -101,7 +102,7 @@ def get_place_by_id(place_id: int) -> Optional[Dict]:
         return None
         
     except Exception as e:
-        print(f"Error fetching place {place_id}: {e}")
+        logger.error(f"Error fetching place {place_id}: {e}")
         return None
 
 def build_route(candidates: List[Dict], start_lat: float, start_lng: float, 
@@ -330,7 +331,7 @@ async def recommend_places(
                     })
 
     except Exception as e:
-        print(f"Error fetching candidates: {e}")
+        logger.error(f"Error fetching candidates: {e}")
         raise HTTPException(status_code=500, detail="Database error")
     
     # Build route
@@ -543,7 +544,7 @@ async def warm_cache(
                             warmed_keys.append(cache_key)
                             
                 except Exception as e:
-                    print(f"Error warming cache for combo {combo}: {e}")
+                    logger.error(f"Error warming cache for combo {combo}: {e}")
                     continue
         
         response_time = round((time.time() - start_time) * 1000, 2)
