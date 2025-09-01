@@ -1,6 +1,7 @@
 # Dependencies
 node_modules/
 */node_modules/
+apps/ui/node_modules/
 
 # Python
 __pycache__/
