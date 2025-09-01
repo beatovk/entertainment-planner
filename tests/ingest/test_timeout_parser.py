@@ -1,4 +1,8 @@
 import sqlite3
+import pytest
+
+pytest.importorskip("requests")
+pytest.importorskip("bs4")
 from apps.ingest.parsers.timeout_bkk import TimeOutBkkParser
 
 

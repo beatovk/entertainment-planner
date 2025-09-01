@@ -3,6 +3,7 @@ import uuid
 from importlib import reload
 
 import pytest
+fastapi = pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient
 
 

@@ -1,9 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Tuple, Optional
+import os
 import sqlite3
-import json
-
-from settings import settings
 
 class SearchProvider(ABC):
     """Abstract interface for search providers"""
@@ -26,9 +24,12 @@ class SearchProvider(ABC):
 class LocalSearchProvider(SearchProvider):
     """Local search provider using FTS5 + deterministic embeddings"""
 
-    def __init__(self, db_path: str = settings.db_path):
-        self.db_path = db_path
+    def __init__(self, db_path: Optional[str] = None):
+        self.db_path = db_path or os.getenv("DB_PATH", "./data/clean.db")
         self.embedding_dim = 64  # Fixed dimension for deterministic vectors
+
+    def _connect(self):
+        return sqlite3.connect(self.db_path)
     
     def _compute_embedding(self, text: str) -> bytes:
         """Compute deterministic embedding using char n-gram hashing trick"""
@@ -73,7 +74,7 @@ class LocalSearchProvider(SearchProvider):
     def index(self, doc_id: int, text: str) -> bool:
         """Index a document with FTS5 and embeddings"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._connect()
             cursor = conn.cursor()
             
             # Insert into FTS5
@@ -100,7 +101,7 @@ class LocalSearchProvider(SearchProvider):
     def knn(self, query_text: str, top_k: int) -> List[Tuple[int, float]]:
         """Find top-k most similar documents using k-NN on embeddings"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._connect()
             cursor = conn.cursor()
             
             # Get query embedding
@@ -129,7 +130,7 @@ class LocalSearchProvider(SearchProvider):
     def fts(self, query: str, top_k: int) -> List[Tuple[int, float]]:
         """Full-text search using FTS5"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._connect()
             cursor = conn.cursor()
             
             cursor.execute('''
