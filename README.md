@@ -56,6 +56,10 @@ python3 -m pip install -r requirements.txt
 python3 apps/ingest/db_init.py
 ```
 
+> **SQLite requirement:** The project relies on SQLite features such as FTS5. The
+> `sqlite3` module is included with Python, but ensure that your Python build is
+> linked against SQLite **3.9 or newer** so these features are available.
+
 ### 2. Run Data Pipeline
 ```bash
 # Parse TimeOut Bangkok data

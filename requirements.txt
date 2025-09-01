@@ -6,6 +6,5 @@ httpx==0.25.2
 mcp==1.0.0
 mcp-server-stdio==1.0.0
 mcp-server-websocket==1.0.0
-sqlite3
 beautifulsoup4==4.12.2
 requests==2.31.0
