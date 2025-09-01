@@ -7,26 +7,25 @@ def test_knn_returns_deterministic_order(tmp_path):
     db_path = tmp_path / "search.db"
     provider = LocalSearchProvider(str(db_path))
 
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute(
-        """
-        CREATE VIRTUAL TABLE fts_places USING FTS5 (
-            name, summary_160, tags
+    with sqlite3.connect(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            CREATE VIRTUAL TABLE fts_places USING FTS5 (
+                name, summary_160, tags
+            )
+            """
         )
-        """
-    )
-    cursor.execute(
-        """
-        CREATE TABLE embeddings (
-            doc_id INTEGER PRIMARY KEY,
-            vector BLOB,
-            dim INTEGER
+        cursor.execute(
+            """
+            CREATE TABLE embeddings (
+                doc_id INTEGER PRIMARY KEY,
+                vector BLOB,
+                dim INTEGER
+            )
+            """
         )
-        """
-    )
-    conn.commit()
-    conn.close()
+        conn.commit()
 
     mock_docs = [
         (1, "Tom Yum Goong Master - Authentic Thai tom yum soup with fresh prawns"),

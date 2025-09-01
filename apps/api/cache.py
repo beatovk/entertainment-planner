@@ -51,45 +51,42 @@ class SQLiteCache:
     def _ensure_table_exists(self) -> None:
         """Ensure cache_entries table exists"""
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS cache_entries (
-                    key TEXT PRIMARY KEY,
-                    value_json TEXT NOT NULL,
-                    stored_at TEXT NOT NULL,
-                    ttl_seconds INTEGER NOT NULL
-                )
-            ''')
-            
-            # Create index for faster lookups
-            cursor.execute('''
-                CREATE INDEX IF NOT EXISTS idx_cache_expiry 
-                ON cache_entries(stored_at, ttl_seconds)
-            ''')
-            
-            conn.commit()
-            conn.close()
-            
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS cache_entries (
+                        key TEXT PRIMARY KEY,
+                        value_json TEXT NOT NULL,
+                        stored_at TEXT NOT NULL,
+                        ttl_seconds INTEGER NOT NULL
+                    )
+                ''')
+
+                # Create index for faster lookups
+                cursor.execute('''
+                    CREATE INDEX IF NOT EXISTS idx_cache_expiry
+                    ON cache_entries(stored_at, ttl_seconds)
+                ''')
+
+                conn.commit()
         except Exception as e:
             print(f"Warning: Could not create cache table: {e}")
     
     def get(self, key: str) -> Optional[Any]:
         """Get value from SQLite cache if not expired"""
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                SELECT value_json, stored_at, ttl_seconds 
-                FROM cache_entries 
-                WHERE key = ?
-            ''', (key,))
-            
-            row = cursor.fetchone()
-            conn.close()
-            
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+
+                cursor.execute('''
+                    SELECT value_json, stored_at, ttl_seconds
+                    FROM cache_entries
+                    WHERE key = ?
+                ''', (key,))
+
+                row = cursor.fetchone()
+
             if not row:
                 return None
             
@@ -114,21 +111,20 @@ class SQLiteCache:
     def set(self, key: str, value: Any, ttl_days: int = 7) -> bool:
         """Set value in SQLite cache with TTL"""
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            ttl_seconds = ttl_days * 24 * 3600
-            stored_at = datetime.now().isoformat()
-            value_json = json.dumps(value, ensure_ascii=False)
-            
-            cursor.execute('''
-                INSERT OR REPLACE INTO cache_entries (key, value_json, stored_at, ttl_seconds)
-                VALUES (?, ?, ?, ?)
-            ''', (key, value_json, stored_at, ttl_seconds))
-            
-            conn.commit()
-            conn.close()
-            return True
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+
+                ttl_seconds = ttl_days * 24 * 3600
+                stored_at = datetime.now().isoformat()
+                value_json = json.dumps(value, ensure_ascii=False)
+
+                cursor.execute('''
+                    INSERT OR REPLACE INTO cache_entries (key, value_json, stored_at, ttl_seconds)
+                    VALUES (?, ?, ?, ?)
+                ''', (key, value_json, stored_at, ttl_seconds))
+
+                conn.commit()
+                return True
             
         except Exception as e:
             print(f"Warning: SQLite cache set error: {e}")
@@ -137,35 +133,33 @@ class SQLiteCache:
     def _remove_expired(self, key: str) -> None:
         """Remove expired entry from cache"""
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            cursor.execute('DELETE FROM cache_entries WHERE key = ?', (key,))
-            conn.commit()
-            conn.close()
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('DELETE FROM cache_entries WHERE key = ?', (key,))
+                conn.commit()
         except Exception as e:
             print(f"Warning: Could not remove expired cache entry: {e}")
     
     def cleanup_expired(self) -> int:
         """Clean up all expired entries, return count removed"""
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            # Find expired entries
-            now = datetime.now().isoformat()
-            cursor.execute('''
-                SELECT key FROM cache_entries 
-                WHERE datetime(stored_at) + (ttl_seconds || ' seconds') < datetime(?)
-            ''', (now,))
-            
-            expired_keys = [row[0] for row in cursor.fetchall()]
-            
-            if expired_keys:
-                placeholders = ','.join(['?' for _ in expired_keys])
-                cursor.execute(f'DELETE FROM cache_entries WHERE key IN ({placeholders})', expired_keys)
-                conn.commit()
-            
-            conn.close()
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+
+                # Find expired entries
+                now = datetime.now().isoformat()
+                cursor.execute('''
+                    SELECT key FROM cache_entries
+                    WHERE datetime(stored_at) + (ttl_seconds || ' seconds') < datetime(?)
+                ''', (now,))
+
+                expired_keys = [row[0] for row in cursor.fetchall()]
+
+                if expired_keys:
+                    placeholders = ','.join(['?' for _ in expired_keys])
+                    cursor.execute(f'DELETE FROM cache_entries WHERE key IN ({placeholders})', expired_keys)
+                    conn.commit()
+
             return len(expired_keys)
             
         except Exception as e:
@@ -239,11 +233,10 @@ class CacheManager:
         sqlite_count = 0
         
         try:
-            conn = sqlite3.connect(self.sqlite_cache.db_path)
-            cursor = conn.cursor()
-            cursor.execute('SELECT COUNT(*) FROM cache_entries')
-            sqlite_count = cursor.fetchone()[0]
-            conn.close()
+            with sqlite3.connect(self.sqlite_cache.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('SELECT COUNT(*) FROM cache_entries')
+                sqlite_count = cursor.fetchone()[0]
         except Exception:
             pass
         
