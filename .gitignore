@@ -24,6 +24,10 @@ wheels/
 .installed.cfg
 *.egg
 
+# Virtual environments
+.venv/
+venv/
+
 # Databases
 *.db
 *.sqlite
@@ -35,6 +39,9 @@ wheels/
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Local configuration files
+*.local
 
 # IDE
 .vscode/
@@ -66,6 +73,13 @@ pids
 
 # Coverage directory used by tools like istanbul
 coverage/
+
+# Test and type artifacts
+.pytest_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
 
 # Temporary files
 *.tmp
