@@ -129,7 +129,7 @@ def test_health_endpoint():
     response = client.get("/api/health")
     assert response.status_code == 200
     data = response.json()
-    assert data["ok"] == True
+    assert data["ok"]
     assert "db" in data
     assert "fts" in data
     assert "X-Search" in response.headers

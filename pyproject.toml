@@ -1,0 +1,8 @@
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+extend-exclude = ["apps/ui/node_modules", "apps/ui/build", "apps/ui/dist"]
+
+[tool.ruff.lint]
+select = ["E", "F"]
+ignore = ["E501", "E722", "F401", "F841", "F541"]

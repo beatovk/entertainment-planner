@@ -90,7 +90,8 @@ class SearchIndexer:
         # Import search provider
         import sys
         sys.path.insert(0, str(Path(__file__).parent.parent.parent / 'packages' / 'search'))
-        import sys; sys.path.append("."); from packages.search.provider import LocalSearchProvider
+        sys.path.append(".")
+        from packages.search.provider import LocalSearchProvider
         
         provider = LocalSearchProvider(self.clean_db)
         
