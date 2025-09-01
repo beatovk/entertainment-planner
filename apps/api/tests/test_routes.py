@@ -1,21 +1,22 @@
 import os
-import json
 import tempfile
 import uuid
 from fastapi.testclient import TestClient
 import sys
 
-# Configure temporary database before importing the app
+# Configure temporary database before importing the app factory
 temp_db_path = os.path.join(
     tempfile.gettempdir(), f"test_db_{uuid.uuid4().hex}.db"
 )
 os.environ["DB_PATH"] = temp_db_path
 
-# Add the parent directory to the path to import the main app
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from main import app
+# Add project root and api directory to path to import the app
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.append(ROOT_DIR)
+sys.path.append(os.path.join(ROOT_DIR, "apps", "api"))
+from main import create_app
 
-client = TestClient(app)
+client = TestClient(create_app())
 
 
 def teardown_module(module):
