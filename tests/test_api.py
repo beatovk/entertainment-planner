@@ -1,29 +1,26 @@
 import os
-import json
-import tempfile
 import uuid
+from importlib import reload
+
+import pytest
 from fastapi.testclient import TestClient
-import sys
-
-# Configure temporary database before importing the app
-temp_db_path = os.path.join(
-    tempfile.gettempdir(), f"test_db_{uuid.uuid4().hex}.db"
-)
-os.environ["DB_PATH"] = temp_db_path
-
-# Add the parent directory to the path to import the main app
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from main import app
-
-client = TestClient(app)
 
 
-def teardown_module(module):
-    if os.path.exists(temp_db_path):
-        os.unlink(temp_db_path)
+@pytest.fixture(scope="module")
+def client(tmp_path_factory):
+    db_path = tmp_path_factory.mktemp("db") / f"{uuid.uuid4().hex}.db"
+    os.environ["DB_PATH"] = str(db_path)
+
+    from apps.api import main
+    reload(main)
+    with TestClient(main.app) as client:
+        yield client
+
+    if db_path.exists():
+        db_path.unlink()
 
 
-def test_health_endpoint():
+def test_health_endpoint(client):
     response = client.get("/api/health")
     assert response.status_code == 200
     data = response.json()
@@ -34,7 +31,7 @@ def test_health_endpoint():
     assert "X-Debug" in response.headers
 
 
-def test_get_place_by_id():
+def test_get_place_by_id(client):
     response = client.get("/api/places/1")
     assert response.status_code == 200
     data = response.json()
@@ -42,7 +39,7 @@ def test_get_place_by_id():
     assert "name" in data
 
 
-def test_recommend_places():
+def test_recommend_places(client):
     params = {
         "vibe": "lazy",
         "intents": "tom-yum,walk,rooftop",
@@ -62,8 +59,7 @@ def test_recommend_places():
     assert "X-Debug" in response.headers
 
 
-def test_recommend_places_missing_params():
-    # Missing vibe
+def test_recommend_places_missing_params(client):
     params = {
         "intents": "tom-yum,walk",
         "lat": 13.7563,
@@ -72,7 +68,6 @@ def test_recommend_places_missing_params():
     resp = client.get("/api/places/recommend", params=params)
     assert resp.status_code == 422
 
-    # Missing intents
     params = {
         "vibe": "lazy",
         "lat": 13.7563,
@@ -81,11 +76,9 @@ def test_recommend_places_missing_params():
     resp = client.get("/api/places/recommend", params=params)
     assert resp.status_code == 422
 
-    # Missing coordinates
     params = {
         "vibe": "lazy",
         "intents": "tom-yum,walk",
     }
     resp = client.get("/api/places/recommend", params=params)
     assert resp.status_code == 422
-
